@@ -1,0 +1,28 @@
+set_scheduler:
+  description: "Set the scheduler for the diffuser."
+  fields:
+    work_duration:
+      description: "The duration (in seconds) the diffuser will work during each cycle."
+      example: 300
+    pause_duration:
+      description: "The duration (in seconds) the diffuser will pause between cycles."
+      example: 600
+    week_days:
+      description: "List of weekdays (0-6, where 0 is Monday) for which the schedule applies."
+      example: [0, 1, 2, 3, 4, 5, 6]
+    device_id:
+      description: "The ID of the device to apply the schedule to. Required if multiple devices are available."
+      example: "device_12345"
+
+run_diffuser:
+  description: "Run the diffuser for a specific time."
+  fields:
+    work_duration:
+      description: "The duration (in seconds) the diffuser will work during each cycle."
+      example: 300
+    pause_duration:
+      description: "The duration (in seconds) the diffuser will pause between cycles."
+      example: 600
+    device_id:
+      description: "The ID of the device to run. Required if multiple devices are available."
+      example: "device_12345"

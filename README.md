@@ -15,13 +15,19 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 ## Installation
 
+### HACS
+
+1. WIP
+
 ### Manual Installation
 
 1. Copy the `aromalink` directory to your Home Assistant `custom_components` directory
+
    - The directory is typically located at `<config>/custom_components/`
    - If the `custom_components` directory doesn't exist, create it
-   
+
    For example:
+
    ```bash
    cp -r aromalink <home_assistant_config>/custom_components/
    ```
@@ -41,17 +47,21 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 The integration provides the following services:
 
 ### `aroma_link_new.set_scheduler`
+
 Set the scheduler for the diffuser.
 
 Parameters:
+
 - `work_duration`: Duration in seconds for the diffuser to work (required)
 - `week_days`: Days of the week to apply the schedule (optional, defaults to all days)
 - `device_id`: The ID of the device to control (optional, required if you have multiple devices)
 
 ### `aroma_link_new.run_diffuser`
+
 Run the diffuser for a specific time.
 
 Parameters:
+
 - `work_duration`: Work duration in seconds for the diffuser (required)
 - `diffuse_time`: Total time in seconds for the diffuser to run (required)
 - `device_id`: The ID of the device to control (optional, required if you have multiple devices)
