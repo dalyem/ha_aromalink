@@ -2,8 +2,8 @@
 import logging
 from datetime import timedelta
 
-from .AromaLinkDeviceCoordinator import AromaLinkDeviceCoordinator
 from .AromaLinkAuthCoordinator import AromaLinkAuthCoordinator
+from .AromaLinkDeviceCoordinator import AromaLinkDeviceCoordinator
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
