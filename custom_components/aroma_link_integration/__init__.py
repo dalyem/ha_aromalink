@@ -666,481 +666,481 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
-class AromaLinkCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching data from the API."""
+# class AromaLinkCoordinator(DataUpdateCoordinator):
+#     """Class to manage fetching data from the API."""
 
-    def __init__(self, hass, username, password, device_id=None):
-        """Initialize."""
-        self.username = username
-        self.password = password
-        self.device_id = device_id  # This can now be None initially
-        self.jsessionid = None
-        self.language_code = "EN"
-        self.session = async_get_clientsession(hass)
-        self.hass = hass
-        self._diffuse_time = DEFAULT_DIFFUSE_TIME
-        self._work_duration = DEFAULT_WORK_DURATION
-        self._last_login_time = 0  # Track when we last logged in
-        self._devices = []  # Store the list of devices
+#     def __init__(self, hass, username, password, device_id=None):
+#         """Initialize."""
+#         self.username = username
+#         self.password = password
+#         self.device_id = device_id  # This can now be None initially
+#         self.jsessionid = None
+#         self.language_code = "EN"
+#         self.session = async_get_clientsession(hass)
+#         self.hass = hass
+#         self._diffuse_time = DEFAULT_DIFFUSE_TIME
+#         self._work_duration = DEFAULT_WORK_DURATION
+#         self._last_login_time = 0  # Track when we last logged in
+#         self._devices = []  # Store the list of devices
 
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=timedelta(minutes=1),
-        )
+#         super().__init__(
+#             hass,
+#             _LOGGER,
+#             name=DOMAIN,
+#             update_interval=timedelta(minutes=1),
+#         )
 
-    async def fetch_device_list(self):
-        """Fetch the list of available devices."""
-        await self._ensure_login()  # Ensures self.jsessionid is valid
+#     async def fetch_device_list(self):
+#         """Fetch the list of available devices."""
+#         await self._ensure_login()  # Ensures self.jsessionid is valid
 
-        url = "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order="
+#         url = "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order="
 
-        headers = {
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": "https://www.aroma-link.com/device/list",
-        }
+#         headers = {
+#             "X-Requested-With": "XMLHttpRequest",
+#             "Origin": "https://www.aroma-link.com",
+#             "Referer": "https://www.aroma-link.com/device/list",
+#         }
 
-        if self.jsessionid and not self.jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
+#         if self.jsessionid and not self.jsessionid.startswith("temp_"):
+#             headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
 
-        try:
-            _LOGGER.debug(f"Fetching device list from: {url}")
-            async with self.session.get(url, headers=headers, timeout=15) as response:
-                if response.status == 200:
-                    response_json = await response.json()
-                    _LOGGER.debug(f"Device list raw response: {response_json}")
+#         try:
+#             _LOGGER.debug(f"Fetching device list from: {url}")
+#             async with self.session.get(url, headers=headers, timeout=15) as response:
+#                 if response.status == 200:
+#                     response_json = await response.json()
+#                     _LOGGER.debug(f"Device list raw response: {response_json}")
 
-                    if "rows" in response_json and response_json["rows"]:
-                        self._devices = response_json["rows"]
+#                     if "rows" in response_json and response_json["rows"]:
+#                         self._devices = response_json["rows"]
 
-                        if not self.device_id and self._devices:
-                            # Use the first device ID if none was specified
-                            self.device_id = self._devices[0]["deviceId"]
-                            _LOGGER.info(
-                                f"Using first available device: {self.device_id} ({self._devices[0].get('deviceName', 'Unknown')})")
+#                         if not self.device_id and self._devices:
+#                             # Use the first device ID if none was specified
+#                             self.device_id = self._devices[0]["deviceId"]
+#                             _LOGGER.info(
+#                                 f"Using first available device: {self.device_id} ({self._devices[0].get('deviceName', 'Unknown')})")
 
-                        return self._devices
-                    else:
-                        _LOGGER.error("No devices found in the response")
-                        raise UpdateFailed(
-                            "No devices found in your Aroma-Link account")
-                elif response.status in [401, 403]:
-                    _LOGGER.warning(
-                        f"Authentication error ({response.status}) fetching device list. JSESSIONID might be invalid.")
-                    self.jsessionid = None
-                    raise UpdateFailed(
-                        f"Authentication error fetching device list: {response.status}")
-                else:
-                    _LOGGER.error(f"Failed to fetch device list, status: {response.status}, response: {await response.text()[:200]}")
-                    raise UpdateFailed(
-                        f"Error fetching device list: status {response.status}")
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Timeout fetching device list")
-            raise UpdateFailed("Timeout fetching device list")
-        except Exception as e:
-            _LOGGER.error(
-                f"Unexpected error fetching device list: {e}", exc_info=True)
-            raise UpdateFailed(f"Unexpected error communicating with API: {e}")
+#                         return self._devices
+#                     else:
+#                         _LOGGER.error("No devices found in the response")
+#                         raise UpdateFailed(
+#                             "No devices found in your Aroma-Link account")
+#                 elif response.status in [401, 403]:
+#                     _LOGGER.warning(
+#                         f"Authentication error ({response.status}) fetching device list. JSESSIONID might be invalid.")
+#                     self.jsessionid = None
+#                     raise UpdateFailed(
+#                         f"Authentication error fetching device list: {response.status}")
+#                 else:
+#                     _LOGGER.error(f"Failed to fetch device list, status: {response.status}, response: {await response.text()[:200]}")
+#                     raise UpdateFailed(
+#                         f"Error fetching device list: status {response.status}")
+#         except asyncio.TimeoutError:
+#             _LOGGER.warning("Timeout fetching device list")
+#             raise UpdateFailed("Timeout fetching device list")
+#         except Exception as e:
+#             _LOGGER.error(
+#                 f"Unexpected error fetching device list: {e}", exc_info=True)
+#             raise UpdateFailed(f"Unexpected error communicating with API: {e}")
 
-        return []
+#         return []
 
-    @property
-    def diffuse_time(self):
-        """Return the diffuse time."""
-        return self._diffuse_time
+#     @property
+#     def diffuse_time(self):
+#         """Return the diffuse time."""
+#         return self._diffuse_time
 
-    @diffuse_time.setter
-    def diffuse_time(self, value):
-        """Set the diffuse time."""
-        self._diffuse_time = value
+#     @diffuse_time.setter
+#     def diffuse_time(self, value):
+#         """Set the diffuse time."""
+#         self._diffuse_time = value
 
-    @property
-    def work_duration(self):
-        """Return the work duration."""
-        return self._work_duration
+#     @property
+#     def work_duration(self):
+#         """Return the work duration."""
+#         return self._work_duration
 
-    @work_duration.setter
-    def work_duration(self, value):
-        """Set the work duration."""
-        self._work_duration = value
+#     @work_duration.setter
+#     def work_duration(self, value):
+#         """Set the work duration."""
+#         self._work_duration = value
 
-    def get_device_info(self):
-        """Get device info for entity setup."""
-        return {
-            "id": self.device_id,
-            "name": self.device_name
-        }
+#     def get_device_info(self):
+#         """Get device info for entity setup."""
+#         return {
+#             "id": self.device_id,
+#             "name": self.device_name
+#         }
 
-    async def _async_update_data(self):
-        """Fetch current device state from API."""
-        await self._ensure_login()  # Ensures self.jsessionid is valid
+#     async def _async_update_data(self):
+#         """Fetch current device state from API."""
+#         await self._ensure_login()  # Ensures self.jsessionid is valid
 
-        # If we don't have a device ID yet, get the device list first
-        if not self.device_id:
-            await self.fetch_device_list()
-            if not self.device_id:
-                raise UpdateFailed(
-                    "No devices found in your Aroma-Link account")
+#         # If we don't have a device ID yet, get the device list first
+#         if not self.device_id:
+#             await self.fetch_device_list()
+#             if not self.device_id:
+#                 raise UpdateFailed(
+#                     "No devices found in your Aroma-Link account")
 
-        url = f"https://www.aroma-link.com/device/deviceInfo/now/{self.device_id}?timeout=1000"
+#         url = f"https://www.aroma-link.com/device/deviceInfo/now/{self.device_id}?timeout=1000"
 
-        headers = {
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
+#         headers = {
+#             "X-Requested-With": "XMLHttpRequest",
+#             "Origin": "https://www.aroma-link.com",
+#             "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
+#         }
 
-        # Only add Cookie header if we have a valid JSESSIONID (not temporary)
-        if self.jsessionid and not self.jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
-        else:
-            _LOGGER.debug(
-                "No valid JSESSIONID for device info call, ensure_login should handle.")
+#         # Only add Cookie header if we have a valid JSESSIONID (not temporary)
+#         if self.jsessionid and not self.jsessionid.startswith("temp_"):
+#             headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
+#         else:
+#             _LOGGER.debug(
+#                 "No valid JSESSIONID for device info call, ensure_login should handle.")
 
-        try:
-            _LOGGER.debug(f"Fetching device info from: {url}")
-            async with self.session.get(url, headers=headers, timeout=15) as response:
-                if response.status == 200:
-                    response_json = await response.json()
-                    _LOGGER.debug(f"Device info raw response: {response_json}")
+#         try:
+#             _LOGGER.debug(f"Fetching device info from: {url}")
+#             async with self.session.get(url, headers=headers, timeout=15) as response:
+#                 if response.status == 200:
+#                     response_json = await response.json()
+#                     _LOGGER.debug(f"Device info raw response: {response_json}")
 
-                    if response_json.get("code") == 200 and "data" in response_json:
-                        device_data = response_json["data"]
-                        is_on = device_data.get("onOff") == 1
-                        return {
-                            "state": is_on,
-                            "onOff": device_data.get("onOff"),
-                            "workStatus": device_data.get("workStatus"),
-                            "workRemainTime": device_data.get("workRemainTime"),
-                            "pauseRemainTime": device_data.get("pauseRemainTime"),
-                            "raw_device_data": device_data,
-                            "device_id": self.device_id,  # Include the device ID in the data
-                            "device_name": next((device.get("deviceName", "Unknown") for device in self._devices if device.get("deviceId") == self.device_id), "Unknown")
-                        }
-                    else:
-                        _LOGGER.error(
-                            f"API error or malformed data fetching device info: {response_json.get('msg', 'Unknown error')}")
-                        raise UpdateFailed(
-                            f"API error or malformed data: {response_json.get('msg', 'No message')}")
-                elif response.status in [401, 403]:
-                    _LOGGER.warning(
-                        f"Authentication error ({response.status}) fetching device info. JSESSIONID might be invalid. Forcing re-login on next attempt.")
-                    self.jsessionid = None
-                    raise UpdateFailed(
-                        f"Authentication error fetching device info: {response.status}")
-                else:
-                    _LOGGER.error(f"Failed to fetch device info, status: {response.status}, response: {await response.text()[:200]}")
-                    raise UpdateFailed(
-                        f"Error fetching device info: status {response.status}")
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Timeout fetching device info.")
-            raise UpdateFailed("Timeout fetching device info.")
-        except Exception as e:
-            _LOGGER.error(
-                f"Unexpected error fetching device info: {e}", exc_info=True)
-            raise UpdateFailed(f"Unexpected error communicating with API: {e}")
+#                     if response_json.get("code") == 200 and "data" in response_json:
+#                         device_data = response_json["data"]
+#                         is_on = device_data.get("onOff") == 1
+#                         return {
+#                             "state": is_on,
+#                             "onOff": device_data.get("onOff"),
+#                             "workStatus": device_data.get("workStatus"),
+#                             "workRemainTime": device_data.get("workRemainTime"),
+#                             "pauseRemainTime": device_data.get("pauseRemainTime"),
+#                             "raw_device_data": device_data,
+#                             "device_id": self.device_id,  # Include the device ID in the data
+#                             "device_name": next((device.get("deviceName", "Unknown") for device in self._devices if device.get("deviceId") == self.device_id), "Unknown")
+#                         }
+#                     else:
+#                         _LOGGER.error(
+#                             f"API error or malformed data fetching device info: {response_json.get('msg', 'Unknown error')}")
+#                         raise UpdateFailed(
+#                             f"API error or malformed data: {response_json.get('msg', 'No message')}")
+#                 elif response.status in [401, 403]:
+#                     _LOGGER.warning(
+#                         f"Authentication error ({response.status}) fetching device info. JSESSIONID might be invalid. Forcing re-login on next attempt.")
+#                     self.jsessionid = None
+#                     raise UpdateFailed(
+#                         f"Authentication error fetching device info: {response.status}")
+#                 else:
+#                     _LOGGER.error(f"Failed to fetch device info, status: {response.status}, response: {await response.text()[:200]}")
+#                     raise UpdateFailed(
+#                         f"Error fetching device info: status {response.status}")
+#         except asyncio.TimeoutError:
+#             _LOGGER.warning("Timeout fetching device info.")
+#             raise UpdateFailed("Timeout fetching device info.")
+#         except Exception as e:
+#             _LOGGER.error(
+#                 f"Unexpected error fetching device info: {e}", exc_info=True)
+#             raise UpdateFailed(f"Unexpected error communicating with API: {e}")
 
-    async def _ensure_login(self):
-        """Ensure we have a valid session, login if needed."""
-        current_time = time.time()
-        session_age = current_time - self._last_login_time
+#     async def _ensure_login(self):
+#         """Ensure we have a valid session, login if needed."""
+#         current_time = time.time()
+#         session_age = current_time - self._last_login_time
 
-        # 20 min or temp ID
-        if self.jsessionid is None or self.jsessionid.startswith("temp_") or session_age > 1200:
-            _LOGGER.debug(
-                "Session expired, temporary, or not established. Attempting login.")
-            login_success = await self._login()
-            if not login_success:
-                _LOGGER.error("Failed to login during ensure_login.")
-                raise UpdateFailed(
-                    "Authentication failed, cannot update device state.")
-        # _LOGGER.debug("Session appears valid.") # Can be noisy
-        return True
+#         # 20 min or temp ID
+#         if self.jsessionid is None or self.jsessionid.startswith("temp_") or session_age > 1200:
+#             _LOGGER.debug(
+#                 "Session expired, temporary, or not established. Attempting login.")
+#             login_success = await self._login()
+#             if not login_success:
+#                 _LOGGER.error("Failed to login during ensure_login.")
+#                 raise UpdateFailed(
+#                     "Authentication failed, cannot update device state.")
+#         # _LOGGER.debug("Session appears valid.") # Can be noisy
+#         return True
 
-    async def _login(self):
-        """Login to Aroma-Link and get session ID."""
-        login_url = "https://www.aroma-link.com/login"
-        data = {"username": self.username, "password": self.password}
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": "https://www.aroma-link.com/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
+#     async def _login(self):
+#         """Login to Aroma-Link and get session ID."""
+#         login_url = "https://www.aroma-link.com/login"
+#         data = {"username": self.username, "password": self.password}
+#         headers = {
+#             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+#             "X-Requested-With": "XMLHttpRequest",
+#             "Origin": "https://www.aroma-link.com",
+#             "Referer": "https://www.aroma-link.com/",
+#             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+#         }
 
-        try:
-            _LOGGER.debug(
-                "Attempting initial GET to aroma-link.com for cookies.")
-            async with self.session.get("https://www.aroma-link.com/", timeout=10) as initial_response:
-                initial_response.raise_for_status()
-                _LOGGER.debug(
-                    f"Initial GET successful (status {initial_response.status}). Cookies: {self.session.cookie_jar.filter_cookies('https://www.aroma-link.com')}")
+#         try:
+#             _LOGGER.debug(
+#                 "Attempting initial GET to aroma-link.com for cookies.")
+#             async with self.session.get("https://www.aroma-link.com/", timeout=10) as initial_response:
+#                 initial_response.raise_for_status()
+#                 _LOGGER.debug(
+#                     f"Initial GET successful (status {initial_response.status}). Cookies: {self.session.cookie_jar.filter_cookies('https://www.aroma-link.com')}")
 
-            _LOGGER.debug(
-                f"Attempting login to {login_url} as {self.username}.")
-            async with self.session.post(login_url, data=data, headers=headers, timeout=10) as response:
-                response_text = await response.text()
-                _LOGGER.debug(
-                    f"Login response status: {response.status}, body: {response_text[:200]}...")
+#             _LOGGER.debug(
+#                 f"Attempting login to {login_url} as {self.username}.")
+#             async with self.session.post(login_url, data=data, headers=headers, timeout=10) as response:
+#                 response_text = await response.text()
+#                 _LOGGER.debug(
+#                     f"Login response status: {response.status}, body: {response_text[:200]}...")
 
-                if response.status == 200:
-                    jsessionid_found = None
+#                 if response.status == 200:
+#                     jsessionid_found = None
 
-                    # Method 1: Try to get JSESSIONID from cookie jar
-                    filtered_cookies = self.session.cookie_jar.filter_cookies(
-                        response.url)
-                    _LOGGER.debug(
-                        f"Filtered cookies from jar: {filtered_cookies}")
+#                     # Method 1: Try to get JSESSIONID from cookie jar
+#                     filtered_cookies = self.session.cookie_jar.filter_cookies(
+#                         response.url)
+#                     _LOGGER.debug(
+#                         f"Filtered cookies from jar: {filtered_cookies}")
 
-                    if "JSESSIONID" in filtered_cookies:
-                        jsessionid_morsel = filtered_cookies["JSESSIONID"]
-                        jsessionid_found = jsessionid_morsel.value
-                        _LOGGER.debug(
-                            f"Found JSESSIONID '{jsessionid_found}' in cookie jar.")
+#                     if "JSESSIONID" in filtered_cookies:
+#                         jsessionid_morsel = filtered_cookies["JSESSIONID"]
+#                         jsessionid_found = jsessionid_morsel.value
+#                         _LOGGER.debug(
+#                             f"Found JSESSIONID '{jsessionid_found}' in cookie jar.")
 
-                    # Method 2: If not found in jar, check response headers
-                    if not jsessionid_found and 'Set-Cookie' in response.headers:
-                        _LOGGER.debug(
-                            f"Looking for JSESSIONID in Set-Cookie header: {response.headers['Set-Cookie']}")
-                        cookie_header = response.headers['Set-Cookie']
-                        if 'JSESSIONID=' in cookie_header:
-                            try:
-                                start = cookie_header.index('JSESSIONID=') + 11
-                                end = cookie_header.index(
-                                    ';', start) if ';' in cookie_header[start:] else len(cookie_header)
-                                jsessionid_found = cookie_header[start:end]
-                                _LOGGER.debug(
-                                    f"Extracted JSESSIONID from header: {jsessionid_found}")
-                            except Exception as e:
-                                _LOGGER.error(
-                                    f"Error extracting JSESSIONID from header: {e}")
+#                     # Method 2: If not found in jar, check response headers
+#                     if not jsessionid_found and 'Set-Cookie' in response.headers:
+#                         _LOGGER.debug(
+#                             f"Looking for JSESSIONID in Set-Cookie header: {response.headers['Set-Cookie']}")
+#                         cookie_header = response.headers['Set-Cookie']
+#                         if 'JSESSIONID=' in cookie_header:
+#                             try:
+#                                 start = cookie_header.index('JSESSIONID=') + 11
+#                                 end = cookie_header.index(
+#                                     ';', start) if ';' in cookie_header[start:] else len(cookie_header)
+#                                 jsessionid_found = cookie_header[start:end]
+#                                 _LOGGER.debug(
+#                                     f"Extracted JSESSIONID from header: {jsessionid_found}")
+#                             except Exception as e:
+#                                 _LOGGER.error(
+#                                     f"Error extracting JSESSIONID from header: {e}")
 
-                    # Method 3: Check if login was successful from response text
-                    if jsessionid_found:
-                        self.jsessionid = jsessionid_found
-                        self._last_login_time = time.time()
-                        _LOGGER.info(
-                            f"Successfully logged in as {self.username}. JSESSIONID obtained: {jsessionid_found[:5]}...")
-                        return True
-                    elif "success" in response_text.lower():
-                        _LOGGER.warning(
-                            "Login response indicates success, but JSESSIONID not found. Creating temporary session ID.")
-                        self.jsessionid = f"temp_login_success_{time.time()}"
-                        self._last_login_time = time.time()
-                        return True
+#                     # Method 3: Check if login was successful from response text
+#                     if jsessionid_found:
+#                         self.jsessionid = jsessionid_found
+#                         self._last_login_time = time.time()
+#                         _LOGGER.info(
+#                             f"Successfully logged in as {self.username}. JSESSIONID obtained: {jsessionid_found[:5]}...")
+#                         return True
+#                     elif "success" in response_text.lower():
+#                         _LOGGER.warning(
+#                             "Login response indicates success, but JSESSIONID not found. Creating temporary session ID.")
+#                         self.jsessionid = f"temp_login_success_{time.time()}"
+#                         self._last_login_time = time.time()
+#                         return True
 
-                        _LOGGER.error(
-                            f"Failed to get JSESSIONID from login response (cookie not found). Body: {response_text[:500]}")
-                        self.jsessionid = None
-                        return False
-                else:
-                    _LOGGER.error(
-                        f"Login failed with status code: {response.status}. Response: {response_text[:500]}")
-                    self.jsessionid = None
-                    return False
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout during login process.")
-            self.jsessionid = None
-            return False
-        except Exception as e:
-            # exc_info=True is good for debugging
-            _LOGGER.error(f"Login error: {e}", exc_info=True)
-            self.jsessionid = None
-            return False
+#                         _LOGGER.error(
+#                             f"Failed to get JSESSIONID from login response (cookie not found). Body: {response_text[:500]}")
+#                         self.jsessionid = None
+#                         return False
+#                 else:
+#                     _LOGGER.error(
+#                         f"Login failed with status code: {response.status}. Response: {response_text[:500]}")
+#                     self.jsessionid = None
+#                     return False
+#         except asyncio.TimeoutError:
+#             _LOGGER.error("Timeout during login process.")
+#             self.jsessionid = None
+#             return False
+#         except Exception as e:
+#             # exc_info=True is good for debugging
+#             _LOGGER.error(f"Login error: {e}", exc_info=True)
+#             self.jsessionid = None
+#             return False
 
-    async def turn_on_off(self, state_to_set):
-        """Turn the diffuser on or off."""
-        await self._ensure_login()
+#     async def turn_on_off(self, state_to_set):
+#         """Turn the diffuser on or off."""
+#         await self._ensure_login()
 
-        # Make sure we have a device ID
-        if not self.device_id:
-            await self.fetch_device_list()
-            if not self.device_id:
-                _LOGGER.error("Cannot control device: No device ID available")
-                return False
+#         # Make sure we have a device ID
+#         if not self.device_id:
+#             await self.fetch_device_list()
+#             if not self.device_id:
+#                 _LOGGER.error("Cannot control device: No device ID available")
+#                 return False
 
-        url = "https://www.aroma-link.com/device/switch"
+#         url = "https://www.aroma-link.com/device/switch"
 
-        data = {
-            "deviceId": self.device_id,
-            "onOff": 1 if state_to_set else 0
-        }
+#         data = {
+#             "deviceId": self.device_id,
+#             "onOff": 1 if state_to_set else 0
+#         }
 
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
+#         headers = {
+#             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+#             "X-Requested-With": "XMLHttpRequest",
+#             "Origin": "https://www.aroma-link.com",
+#             "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
+#         }
 
-        if self.jsessionid and not self.jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
+#         if self.jsessionid and not self.jsessionid.startswith("temp_"):
+#             headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
 
-        try:
-            async with self.session.post(url, data=data, headers=headers, timeout=10) as response:
-                if response.status == 200:
-                    _LOGGER.info(
-                        f"Successfully commanded device {self.device_id} to {'on' if state_to_set else 'off'}")
-                    await self.async_request_refresh()
-                    return True
-                elif response.status in [401, 403]:
-                    _LOGGER.warning(
-                        f"Authentication error on turn_on_off ({response.status}). Forcing re-login.")
-                    self.jsessionid = None
-                    return False
-                else:
-                    _LOGGER.error(f"Failed to control device: {response.status}, Response: {await response.text()[:200]}")
-                    return False
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout controlling device.")
-            return False
-        except Exception as e:
-            _LOGGER.error(f"Control error: {e}", exc_info=True)
-            return False
+#         try:
+#             async with self.session.post(url, data=data, headers=headers, timeout=10) as response:
+#                 if response.status == 200:
+#                     _LOGGER.info(
+#                         f"Successfully commanded device {self.device_id} to {'on' if state_to_set else 'off'}")
+#                     await self.async_request_refresh()
+#                     return True
+#                 elif response.status in [401, 403]:
+#                     _LOGGER.warning(
+#                         f"Authentication error on turn_on_off ({response.status}). Forcing re-login.")
+#                     self.jsessionid = None
+#                     return False
+#                 else:
+#                     _LOGGER.error(f"Failed to control device: {response.status}, Response: {await response.text()[:200]}")
+#                     return False
+#         except asyncio.TimeoutError:
+#             _LOGGER.error("Timeout controlling device.")
+#             return False
+#         except Exception as e:
+#             _LOGGER.error(f"Control error: {e}", exc_info=True)
+#             return False
 
-    async def set_scheduler(self, work_duration, week_days=None):
-        """Set the scheduler for the diffuser."""
-        await self._ensure_login()
+#     async def set_scheduler(self, work_duration, week_days=None):
+#         """Set the scheduler for the diffuser."""
+#         await self._ensure_login()
 
-        # Make sure we have a device ID
-        if not self.device_id:
-            await self.fetch_device_list()
-            if not self.device_id:
-                _LOGGER.error("Cannot set scheduler: No device ID available")
-                return False
+#         # Make sure we have a device ID
+#         if not self.device_id:
+#             await self.fetch_device_list()
+#             if not self.device_id:
+#                 _LOGGER.error("Cannot set scheduler: No device ID available")
+#                 return False
 
-        url = "https://www.aroma-link.com/device/workSet"
+#         url = "https://www.aroma-link.com/device/workSet"
 
-        if week_days is None:
-            week_days = [0, 1, 2, 3, 4, 5, 6]  # Default to all days
+#         if week_days is None:
+#             week_days = [0, 1, 2, 3, 4, 5, 6]  # Default to all days
 
-        payload = {
-            "deviceId": self.device_id,
-            "type": "workTime",
-            "week": week_days,
-            "workTimeList": [
-                {
-                    "startTime": "00:00",
-                    "endTime": "23:59",
-                    "enabled": 1,
-                    "consistenceLevel": "1",
-                    "workDuration": str(work_duration),
-                    "pauseDuration": "900"
-                },
-                {
-                    "startTime": "00:00",
-                    "endTime": "24:00",
-                    "enabled": 0,
-                    "consistenceLevel": "1",
-                    "workDuration": "10",
-                    "pauseDuration": "900"
-                },
-                {
-                    "startTime": "00:00",
-                    "endTime": "24:00",
-                    "enabled": 0,
-                    "consistenceLevel": "1",
-                    "workDuration": "10",
-                    "pauseDuration": "900"
-                },
-                {
-                    "startTime": "00:00",
-                    "endTime": "24:00",
-                    "enabled": 0,
-                    "consistenceLevel": "1",
-                    "workDuration": "10",
-                    "pauseDuration": "900"
-                },
-                {
-                    "startTime": "00:00",
-                    "endTime": "24:00",
-                    "enabled": 0,
-                    "consistenceLevel": "1",
-                    "workDuration": "10",
-                    "pauseDuration": "900"
-                }
-            ]
-        }
+#         payload = {
+#             "deviceId": self.device_id,
+#             "type": "workTime",
+#             "week": week_days,
+#             "workTimeList": [
+#                 {
+#                     "startTime": "00:00",
+#                     "endTime": "23:59",
+#                     "enabled": 1,
+#                     "consistenceLevel": "1",
+#                     "workDuration": str(work_duration),
+#                     "pauseDuration": "900"
+#                 },
+#                 {
+#                     "startTime": "00:00",
+#                     "endTime": "24:00",
+#                     "enabled": 0,
+#                     "consistenceLevel": "1",
+#                     "workDuration": "10",
+#                     "pauseDuration": "900"
+#                 },
+#                 {
+#                     "startTime": "00:00",
+#                     "endTime": "24:00",
+#                     "enabled": 0,
+#                     "consistenceLevel": "1",
+#                     "workDuration": "10",
+#                     "pauseDuration": "900"
+#                 },
+#                 {
+#                     "startTime": "00:00",
+#                     "endTime": "24:00",
+#                     "enabled": 0,
+#                     "consistenceLevel": "1",
+#                     "workDuration": "10",
+#                     "pauseDuration": "900"
+#                 },
+#                 {
+#                     "startTime": "00:00",
+#                     "endTime": "24:00",
+#                     "enabled": 0,
+#                     "consistenceLevel": "1",
+#                     "workDuration": "10",
+#                     "pauseDuration": "900"
+#                 }
+#             ]
+#         }
 
-        headers = {
-            "Content-Type": "application/json;charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
-        if self.jsessionid and not self.jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
+#         headers = {
+#             "Content-Type": "application/json;charset=UTF-8",
+#             "X-Requested-With": "XMLHttpRequest",
+#             "Origin": "https://www.aroma-link.com",
+#             "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
+#         }
+#         if self.jsessionid and not self.jsessionid.startswith("temp_"):
+#             headers["Cookie"] = f"languagecode={self.language_code}; JSESSIONID={self.jsessionid}"
 
-        try:
-            async with self.session.post(url, json=payload, headers=headers, timeout=10) as response:
-                if response.status == 200:
-                    _LOGGER.info(
-                        f"Successfully set scheduler for device {self.device_id}")
-                    await self.async_request_refresh()
-                    return True
-                elif response.status in [401, 403]:
-                    _LOGGER.warning(
-                        f"Authentication error on set_scheduler ({response.status}). Forcing re-login.")
-                    self.jsessionid = None
-                    return False
-                else:
-                    _LOGGER.error(f"Failed to set scheduler: {response.status}, Response: {await response.text()[:200]}")
-                    return False
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout setting scheduler.")
-            return False
-        except Exception as e:
-            _LOGGER.error(f"Scheduler error: {e}", exc_info=True)
-            return False
+#         try:
+#             async with self.session.post(url, json=payload, headers=headers, timeout=10) as response:
+#                 if response.status == 200:
+#                     _LOGGER.info(
+#                         f"Successfully set scheduler for device {self.device_id}")
+#                     await self.async_request_refresh()
+#                     return True
+#                 elif response.status in [401, 403]:
+#                     _LOGGER.warning(
+#                         f"Authentication error on set_scheduler ({response.status}). Forcing re-login.")
+#                     self.jsessionid = None
+#                     return False
+#                 else:
+#                     _LOGGER.error(f"Failed to set scheduler: {response.status}, Response: {await response.text()[:200]}")
+#                     return False
+#         except asyncio.TimeoutError:
+#             _LOGGER.error("Timeout setting scheduler.")
+#             return False
+#         except Exception as e:
+#             _LOGGER.error(f"Scheduler error: {e}", exc_info=True)
+#             return False
 
-    async def run_diffuser(self, work_duration=None, diffuse_time=None):
-        """Run the diffuser for a specific time."""
+#     async def run_diffuser(self, work_duration=None, diffuse_time=None):
+#         """Run the diffuser for a specific time."""
 
-        # Make sure we have a device ID
-        if not self.device_id:
-            await self.fetch_device_list()
-            if not self.device_id:
-                _LOGGER.error("Cannot run diffuser: No device ID available")
-                return False
+#         # Make sure we have a device ID
+#         if not self.device_id:
+#             await self.fetch_device_list()
+#             if not self.device_id:
+#                 _LOGGER.error("Cannot run diffuser: No device ID available")
+#                 return False
 
-        # Use coordinator's default values if specific ones aren't provided
-        current_work_duration = work_duration if work_duration is not None else self.work_duration
-        current_diffuse_time = diffuse_time if diffuse_time is not None else self.diffuse_time
-        buffertime = current_work_duration + 5  # Add buffer time
+#         # Use coordinator's default values if specific ones aren't provided
+#         current_work_duration = work_duration if work_duration is not None else self.work_duration
+#         current_diffuse_time = diffuse_time if diffuse_time is not None else self.diffuse_time
+#         buffertime = current_work_duration + 5  # Add buffer time
 
-        _LOGGER.info(
-            f"Setting up diffuser to run for {current_diffuse_time} seconds with {current_work_duration} second diffusion cycles")
+#         _LOGGER.info(
+#             f"Setting up diffuser to run for {current_diffuse_time} seconds with {current_work_duration} second diffusion cycles")
 
-        # Set scheduler
-        if not await self.set_scheduler(current_work_duration):
-            _LOGGER.error("Failed to set scheduler for run_diffuser sequence")
-            return False
+#         # Set scheduler
+#         if not await self.set_scheduler(current_work_duration):
+#             _LOGGER.error("Failed to set scheduler for run_diffuser sequence")
+#             return False
 
-        await asyncio.sleep(1)  # Allow time for scheduler settings to apply
+#         await asyncio.sleep(1)  # Allow time for scheduler settings to apply
 
-        if not await self.turn_on_off(True):
-            _LOGGER.error(
-                "Failed to turn on diffuser for run_diffuser sequence")
-            return False
+#         if not await self.turn_on_off(True):
+#             _LOGGER.error(
+#                 "Failed to turn on diffuser for run_diffuser sequence")
+#             return False
 
-        _LOGGER.info(
-            f"Diffuser turned on. Will turn off automatically after {buffertime} seconds.")
+#         _LOGGER.info(
+#             f"Diffuser turned on. Will turn off automatically after {buffertime} seconds.")
 
-        # Schedule turn off after the specified time
-        async def turn_off_later():
-            await asyncio.sleep(buffertime)
-            _LOGGER.info(
-                f"Timer complete for run_diffuser. Attempting to turn off device {self.device_id}.")
-            if not await self.turn_on_off(False):
-                _LOGGER.error(
-                    f"Failed to automatically turn off device {self.device_id} after run_diffuser sequence.")
-            else:
-                _LOGGER.info(
-                    f"Device {self.device_id} turned off successfully after run_diffuser sequence.")
+#         # Schedule turn off after the specified time
+#         async def turn_off_later():
+#             await asyncio.sleep(buffertime)
+#             _LOGGER.info(
+#                 f"Timer complete for run_diffuser. Attempting to turn off device {self.device_id}.")
+#             if not await self.turn_on_off(False):
+#                 _LOGGER.error(
+#                     f"Failed to automatically turn off device {self.device_id} after run_diffuser sequence.")
+#             else:
+#                 _LOGGER.info(
+#                     f"Device {self.device_id} turned off successfully after run_diffuser sequence.")
 
-        self.hass.async_create_task(turn_off_later())
+#         self.hass.async_create_task(turn_off_later())
 
-        return True
+#         return True
