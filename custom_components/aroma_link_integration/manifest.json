@@ -2,13 +2,13 @@
   "domain": "aroma_link_integration",
   "name": "Aroma-Link Integration",
   "after_dependencies": [],
-  "codeowners": ["@DalyMauldin"],
+  "codeowners": ["@Memberapple"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/DalyMauldin/ha_aromalink#readme",
+  "documentation": "https://github.com/Memberapple/ha_aromalink#readme",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/DalyMauldin/ha_aromalink/issues",
+  "issue_tracker": "https://github.com/Memberapple/ha_aromalink/issues",
   "loggers": ["custom_components.aroma_link_integration"],
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.1.0"
 }
