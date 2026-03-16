@@ -1,6 +1,7 @@
 """Constants for the Aroma-Link integration."""
 
 DOMAIN = "aroma_link_integration"
+AROMA_LINK_SSL = False  # Temporary workaround for Aroma-Link's expired certificate.
 
 # Configuration
 CONF_USERNAME = "username"
