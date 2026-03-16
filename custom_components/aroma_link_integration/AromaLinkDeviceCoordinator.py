@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .const import (
+    AROMA_LINK_SSL,
     DOMAIN,
     DEFAULT_DIFFUSE_TIME,
     DEFAULT_WORK_DURATION,
@@ -81,7 +82,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(
                 f"Fetching work time settings for device {self.device_id} day {week_day}")
-            async with self.auth_coordinator.session.get(url, headers=headers, timeout=15) as response:
+            async with self.auth_coordinator.session.get(
+                url,
+                headers=headers,
+                timeout=15,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 if response.status == 200:
                     response_json = await response.json()
 
@@ -146,7 +152,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
-            async with self.auth_coordinator.session.get(url, headers=headers, timeout=15) as response:
+            async with self.auth_coordinator.session.get(
+                url,
+                headers=headers,
+                timeout=15,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 if response.status == 200:
                     response_json = await response.json()
 
@@ -205,7 +216,13 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
 
         try:
-            async with self.auth_coordinator.session.post(url, data=data, headers=headers, timeout=10) as response:
+            async with self.auth_coordinator.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=10,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 if response.status == 200:
                     _LOGGER.info(
                         f"Successfully commanded device {self.device_id} to {'on' if state_to_set else 'off'}")
@@ -297,7 +314,13 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
 
         try:
-            async with self.auth_coordinator.session.post(url, json=payload, headers=headers, timeout=10) as response:
+            async with self.auth_coordinator.session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=10,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 if response.status == 200:
                     _LOGGER.info(
                         f"Successfully set scheduler for device {self.device_id}")

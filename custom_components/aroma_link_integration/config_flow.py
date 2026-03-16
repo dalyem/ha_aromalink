@@ -6,7 +6,13 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import aiohttp
 
-from .const import DOMAIN, CONF_USERNAME, CONF_PASSWORD, CONF_DEVICE_ID
+from .const import (
+    AROMA_LINK_SSL,
+    DOMAIN,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_DEVICE_ID,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -115,7 +121,12 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # First, attempt login to get JSESSIONID
             _LOGGER.debug(f"Attempting login for {username}")
             
-            async with session.post(login_url, data=data, headers=headers) as response:
+            async with session.post(
+                login_url,
+                data=data,
+                headers=headers,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 _LOGGER.debug(f"Login response status: {response.status}")
                 
                 response_text = await response.text()
@@ -210,7 +221,11 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # First do an initial page load to ensure cookies are set properly
             try:
                 _LOGGER.debug("Making initial request to device page")
-                async with session.get("https://www.aroma-link.com/device/list", timeout=10) as init_response:
+                async with session.get(
+                    "https://www.aroma-link.com/device/list",
+                    timeout=10,
+                    ssl=AROMA_LINK_SSL,
+                ) as init_response:
                     _LOGGER.debug(f"Initial page request status: {init_response.status}")
             except Exception as e:
                 _LOGGER.warning(f"Initial page request failed, but continuing: {e}")
@@ -224,7 +239,11 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             _LOGGER.debug(f"Fetching device list with URL: {device_list_url}")
             
-            async with session.get(device_list_url, headers=device_headers) as device_response:
+            async with session.get(
+                device_list_url,
+                headers=device_headers,
+                ssl=AROMA_LINK_SSL,
+            ) as device_response:
                 _LOGGER.debug(f"Device list response status: {device_response.status}")
                 
                 if device_response.status == 200:

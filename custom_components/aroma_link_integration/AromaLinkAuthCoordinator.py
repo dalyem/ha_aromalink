@@ -6,7 +6,7 @@ from datetime import timedelta
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN
+from .const import AROMA_LINK_SSL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,14 +68,24 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(
                 "Attempting initial GET to aroma-link.com for cookies.")
-            async with self.session.get("https://www.aroma-link.com/", timeout=10) as initial_response:
+            async with self.session.get(
+                "https://www.aroma-link.com/",
+                timeout=10,
+                ssl=AROMA_LINK_SSL,
+            ) as initial_response:
                 initial_response.raise_for_status()
                 _LOGGER.debug(
                     f"Initial GET successful (status {initial_response.status}).")
 
             _LOGGER.debug(
                 f"Attempting login to {login_url} as {self.username}.")
-            async with self.session.post(login_url, data=data, headers=headers, timeout=10) as response:
+            async with self.session.post(
+                login_url,
+                data=data,
+                headers=headers,
+                timeout=10,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
                 response_text = await response.text()
                 _LOGGER.debug(f"Login response status: {response.status}")
 
