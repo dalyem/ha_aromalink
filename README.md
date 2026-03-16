@@ -1,8 +1,10 @@
-# Aroma-Link Integration for Home Assistant
+# HA Aroma-Link Integration for Home Assistant
 
 This custom component provides integration with Aroma-Link WiFi diffusers in Home Assistant.
 
-> **Note:** The integration appears in Home Assistant as "Aroma-Link Integration" with the domain `aroma_link_integration`
+> **Note:** The integration appears in Home Assistant as "HA Aroma-Link" with the domain `ha_aroma_link`
+
+> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration` and `dalyem_aroma_link` config entries will not be reused automatically. Add `HA Aroma-Link` as a new integration after updating.
 
 ![Aroma-Link logo](brand/logo.png)
 
@@ -39,7 +41,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 ### Manual Installation
 
-1. Copy the `aroma_link_integration` directory to your Home Assistant `custom_components` directory
+1. Copy the `ha_aroma_link` directory to your Home Assistant `custom_components` directory
 
    - The directory is typically located at `<config>/custom_components/`
    - If the `custom_components` directory doesn't exist, create it
@@ -47,7 +49,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
    For example:
 
    ```bash
-   cp -r custom_components/aroma_link_integration <home_assistant_config>/custom_components/
+   cp -r custom_components/ha_aroma_link <home_assistant_config>/custom_components/
    ```
 
 2. Restart Home Assistant
@@ -56,7 +58,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 1. In Home Assistant, go to **Settings** → **Devices and Services**
 2. Click the **+ ADD INTEGRATION** button
-3. Search for "Aroma-Link Integration" and select it
+3. Search for "HA Aroma-Link" and select it
 4. Enter your Aroma-Link username and password
 5. The integration will automatically discover and add all devices in your account
 
@@ -64,7 +66,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 The integration provides the following services:
 
-### `aroma_link_integration.set_scheduler`
+### `ha_aroma_link.set_scheduler`
 
 Set the scheduler for the diffuser.
 
@@ -74,7 +76,7 @@ Parameters:
 - `week_days`: Days of the week to apply the schedule (optional, defaults to all days)
 - `device_id`: The ID of the device to control (optional, required if you have multiple devices)
 
-### `aroma_link_integration.run_diffuser`
+### `ha_aroma_link.run_diffuser`
 
 Run the diffuser for a specific time.
 
@@ -137,6 +139,8 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 ## Version History
 
+- 1.3.0: Renamed the fork to the `ha_aroma_link` domain with a neutral HA-specific identity
+- 1.2.0: Renamed the fork to its own Home Assistant domain so it installs as a separate integration
 - 1.1.0: Updated to support HACS integration
 - 1.0.0: Initial release with automatic device discovery
 
