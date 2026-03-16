@@ -4,6 +4,8 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 > **Note:** The integration appears in Home Assistant as "Aroma-Link Integration" with the domain `aroma_link_integration`
 
+![Aroma-Link logo](brand/logo.png)
+
 ## Features
 
 - Control diffuser power state (on/off)
@@ -25,7 +27,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 4. Click **Custom repositories**
 
-5. Paste the github repository url `https://github.com/Memberapple/ha_aromalink`
+5. Paste the GitHub repository URL `https://github.com/dalyem/ha_aromalink`
 
 6. Select **integration** as the type then click **ADD**
 
@@ -45,7 +47,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
    For example:
 
    ```bash
-   cp -r aroma_link_integration <home_assistant_config>/custom_components/
+   cp -r custom_components/aroma_link_integration <home_assistant_config>/custom_components/
    ```
 
 2. Restart Home Assistant
@@ -72,7 +74,7 @@ Parameters:
 - `week_days`: Days of the week to apply the schedule (optional, defaults to all days)
 - `device_id`: The ID of the device to control (optional, required if you have multiple devices)
 
-### `aroma_link_new.run_diffuser`
+### `aroma_link_integration.run_diffuser`
 
 Run the diffuser for a specific time.
 
@@ -149,11 +151,8 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 This integration is provided as-is with no warranties.
 
-## Credits
-
-Developed for Home Assistant community use.
-
 ## Links
 
-- [Documentation](https://github.com/Memberapple/ha_aromalink/blob/master/README.md)
-- [Issue Tracker](https://github.com/Memberapple/ha_aromalink/issues)
+- [Repository](https://github.com/dalyem/ha_aromalink)
+- [Documentation](https://github.com/dalyem/ha_aromalink#readme)
+- [Issue Tracker](https://github.com/dalyem/ha_aromalink/issues)
