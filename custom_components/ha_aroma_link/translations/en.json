@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Aroma-Link Login",
+        "title": "HA Aroma-Link Login",
         "description": "Enter your Aroma-Link account credentials. All your devices will be automatically discovered.",
         "data": {
           "username": "Aroma-Link Username",
