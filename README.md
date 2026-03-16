@@ -4,7 +4,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 > **Note:** The integration appears in Home Assistant as "HA Aromalink" with the domain `ha_aromalink`
 
-> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration`, `dalyem_aroma_link`, and `ha_aroma_link` config entries will not be reused automatically. Add `HA Aromalink` as a new integration after updating.
+> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration`, `dalyem_aroma_link`, and `ha_aroma_link` config entries will not be reused automatically. Add `HA Aromalink` as a new integration after updating. If HACS was tracking an older folder/domain name, remove and re-add the custom repository so HACS refreshes the repository content path.
 
 ![Aroma-Link logo](brand/logo.png)
 
@@ -38,6 +38,8 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 8. Click **Download**
 
 9. Restart Home Assistant
+
+> **Repository note:** HACS installs from the repository's default branch or published release. If you rename the integration folder or domain, those changes must be present on the default branch before HACS can download them.
 
 ### Manual Installation
 
@@ -125,6 +127,7 @@ The new auto-discovery feature eliminates the need to manually find your device 
 - Check the Home Assistant logs for debugging information
 - Make sure your diffuser is connected to your WiFi network and accessible from the internet
 - If automatic device discovery fails, you can still manually specify your device ID
+- If HACS reports `No content to download`, verify that the default branch contains `custom_components/ha_aromalink/manifest.json` and the latest integration files. If you renamed the integration folder/domain, remove and re-add the custom repository in HACS so it refreshes the cached content path
 
 ## FAQ
 
