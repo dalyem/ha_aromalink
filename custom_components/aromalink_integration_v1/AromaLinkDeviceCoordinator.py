@@ -243,8 +243,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
     async def _fetch_web_list_state(self, jsessionid):
         """Fetch device state from the device list endpoints as a fallback."""
         endpoints = (
-            "https://www.aroma-link.com/device/list",
             "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order=",
+            "https://www.aroma-link.com/device/list",
         )
 
         headers = self._build_headers(
@@ -674,122 +674,31 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch current device state from API."""
-        # Ensure auth is valid
         await self.auth_coordinator._ensure_login()
         jsessionid = self.auth_coordinator.jsessionid
-
-        url = f"https://www.aroma-link.com/device/deviceInfo/now/{self.device_id}?timeout=1000"
-
-        await self._prime_device_session(jsessionid)
-        headers = self._build_headers(
-            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
-            jsessionid=jsessionid,
-        )
+        previous_data = self.data if isinstance(self.data, dict) else self._default_device_data()
 
         try:
-            app_data = await self._fetch_app_device_info()
-            previous_data = self.data if isinstance(self.data, dict) else self._default_device_data()
-            merged_app_data = self._merge_device_data(previous_data, app_data)
-
-            if app_data is not None and app_data.get("onOff") is not None:
-                return self._apply_recent_switch_state(merged_app_data)
-
             web_list_data = await self._fetch_web_list_state(jsessionid)
             if web_list_data is not None:
                 return self._apply_recent_switch_state(
-                    self._merge_device_data(previous_data, app_data, web_list_data)
+                    self._merge_device_data(previous_data, web_list_data)
                 )
 
-            _LOGGER.debug(
-                f"Fetching info for device {self.device_id} from: {url}")
-            self._log_request("GET", url)
-            response = await self.auth_coordinator.session.get(
-                url,
-                headers=headers,
-                timeout=15,
-                ssl=AROMA_LINK_SSL,
+            app_data = await self._fetch_app_device_info()
+            if app_data is not None:
+                return self._apply_recent_switch_state(
+                    self._merge_device_data(previous_data, app_data)
+                )
+
+            _LOGGER.warning(
+                "Failed to fetch runtime state for device %s from web list and app newWork endpoints.",
+                self.device_id,
             )
-            async with response:
-                self._log_response("GET", url, response.status)
-                if response.status == 200:
-                    response_json = await response.json()
-
-                    if response_json.get("code") == 200 and "data" in response_json:
-                        device_data = response_json["data"]
-                        web_data = {
-                            "state": device_data.get("onOff") == 1,
-                            "onOff": device_data.get("onOff"),
-                            "workStatus": device_data.get("workStatus"),
-                            "workRemainTime": device_data.get("workRemainTime"),
-                            "pauseRemainTime": device_data.get("pauseRemainTime"),
-                            "raw_device_data": device_data,
-                            "device_id": self.device_id,
-                            "device_name": self.device_name
-                        }
-                        return self._apply_recent_switch_state(
-                            self._merge_device_data(previous_data, app_data, web_data)
-                        )
-                    else:
-                        error_msg = response_json.get("msg", "Unknown error")
-                        _LOGGER.error(
-                            f"API error for device {self.device_id}: {error_msg}")
-                        raise UpdateFailed(f"API error: {error_msg}")
-                elif response.status in [401, 403]:
-                    _LOGGER.warning(
-                        f"Authentication error ({response.status}) for device {self.device_id}. Forcing re-login.")
-                    self.auth_coordinator.jsessionid = None
-                    raise UpdateFailed(f"Authentication error")
-                elif response.status == 503:
-                    await self._prime_device_session(jsessionid, force=True)
-                    self._log_request("GET", url, extra="retry_after_503=true")
-                    retry_response = await self.auth_coordinator.session.get(
-                        url,
-                        headers=headers,
-                        timeout=15,
-                        ssl=AROMA_LINK_SSL,
-                    )
-                    async with retry_response:
-                        self._log_response("GET", url, retry_response.status)
-                        if retry_response.status == 200:
-                            response_json = await retry_response.json()
-                            if response_json.get("code") == 200 and "data" in response_json:
-                                device_data = response_json["data"]
-                                web_data = {
-                                    "state": device_data.get("onOff") == 1,
-                                    "onOff": device_data.get("onOff"),
-                                    "workStatus": device_data.get("workStatus"),
-                                    "workRemainTime": device_data.get("workRemainTime"),
-                                    "pauseRemainTime": device_data.get("pauseRemainTime"),
-                                    "raw_device_data": device_data,
-                                    "device_id": self.device_id,
-                                    "device_name": self.device_name,
-                                }
-                                return self._apply_recent_switch_state(
-                                    self._merge_device_data(previous_data, app_data, web_data)
-                                )
-
-                    _LOGGER.warning(
-                        "Failed to fetch device %s info after retry, status: %s",
-                        self.device_id,
-                        retry_response.status,
-                    )
-                    if app_data is not None:
-                        return self._apply_recent_switch_state(merged_app_data)
-                    raise UpdateFailed(
-                        f"Error fetching device info: status {retry_response.status}"
-                    )
-                else:
-                    _LOGGER.warning(
-                        f"Failed to fetch device {self.device_id} info, status: {response.status}")
-                    if app_data is not None:
-                        return self._apply_recent_switch_state(merged_app_data)
-                    raise UpdateFailed(
-                        f"Error fetching device info: status {response.status}")
+            raise UpdateFailed("Failed to fetch device runtime state")
         except UpdateFailed:
             raise
         except Exception as e:
-            if app_data is not None:
-                return self._apply_recent_switch_state(merged_app_data)
             _LOGGER.error(f"Error fetching device {self.device_id} info: {e}")
             raise UpdateFailed(f"Error: {e}")
 

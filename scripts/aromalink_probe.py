@@ -32,6 +32,7 @@ class ProbeConfig:
     device_id: str | None
     verify_ssl: bool
     switch_state: str | None
+    set_scheduler: bool
 
 
 @dataclass
@@ -98,6 +99,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device-id", help="Override device ID from env file.")
     parser.add_argument("--user-id", help="Override user ID from env file.")
     parser.add_argument("--switch", choices=("on", "off"), help="Optionally send a real app switch command.")
+    parser.add_argument(
+        "--set-scheduler",
+        action="store_true",
+        help="Send a real scheduler update using work=10 and pause=800.",
+    )
     parser.add_argument("--skip-web", action="store_true", help="Skip the legacy website probes.")
     parser.add_argument("--skip-app", action="store_true", help="Skip the mobile app probes.")
     return parser.parse_args()
@@ -145,6 +151,7 @@ def build_config(args: argparse.Namespace) -> ProbeConfig:
         device_id=args.device_id or get_value("AROMALINK_DEVICE_ID"),
         verify_ssl=env_bool(get_value("AROMALINK_VERIFY_SSL"), default=False),
         switch_state=args.switch,
+        set_scheduler=args.set_scheduler,
     )
 
 
@@ -428,6 +435,71 @@ def probe_web_endpoints(client: ProbeClient, config: ProbeConfig) -> None:
         headers=headers,
     )
     print_response("web_work_time", response)
+
+    if config.set_scheduler:
+        payload = {
+            "deviceId": config.device_id,
+            "type": "workTime",
+            "week": [0, 1, 2, 3, 4, 5, 6],
+            "workTimeList": [
+                {
+                    "startTime": "00:00",
+                    "endTime": "23:59",
+                    "enabled": 1,
+                    "consistenceLevel": "1",
+                    "workDuration": "10",
+                    "pauseDuration": "800",
+                },
+                {
+                    "startTime": "00:00",
+                    "endTime": "24:00",
+                    "enabled": 0,
+                    "consistenceLevel": "1",
+                    "workDuration": "10",
+                    "pauseDuration": "900",
+                },
+                {
+                    "startTime": "00:00",
+                    "endTime": "24:00",
+                    "enabled": 0,
+                    "consistenceLevel": "1",
+                    "workDuration": "10",
+                    "pauseDuration": "900",
+                },
+                {
+                    "startTime": "00:00",
+                    "endTime": "24:00",
+                    "enabled": 0,
+                    "consistenceLevel": "1",
+                    "workDuration": "10",
+                    "pauseDuration": "900",
+                },
+                {
+                    "startTime": "00:00",
+                    "endTime": "24:00",
+                    "enabled": 0,
+                    "consistenceLevel": "1",
+                    "workDuration": "10",
+                    "pauseDuration": "900",
+                },
+            ],
+        }
+        scheduler_headers = dict(headers)
+        scheduler_headers["Content-Type"] = "application/json;charset=UTF-8"
+        response = client.request(
+            "POST",
+            "https://www.aroma-link.com/device/workSet",
+            headers=scheduler_headers,
+            data=json.dumps(payload).encode("utf-8"),
+        )
+        print_response("web_work_set_10_800", response)
+
+        response = client.request(
+            "GET",
+            f"https://www.aroma-link.com/device/workTime/{config.device_id}?week=0",
+            headers=headers,
+        )
+        print_response("web_work_time_after_set", response)
 
 
 def main() -> None:
