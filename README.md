@@ -129,6 +129,33 @@ The new auto-discovery feature eliminates the need to manually find your device 
 - If automatic device discovery fails, you can still manually specify your device ID
 - If HACS reports `No content to download`, verify that the default branch contains `custom_components/aromalink_integration_v1/manifest.json` and the latest integration files. If you renamed the integration folder/domain, remove and re-add the custom repository in HACS so it refreshes the cached content path
 
+### Local Endpoint Probe
+
+If you want to test Aroma-Link endpoints without pushing commits or updating HACS, use the standalone probe script:
+
+1. Copy [.env.aromalink.example](/Users/dalymauldin/.t3/worktrees/ha_aromalink/auth-issues/.env.aromalink.example) to `.env.aromalink`
+2. Fill in your Aroma-Link username/password and optionally `AROMALINK_USER_ID` / `AROMALINK_DEVICE_ID`
+3. Run:
+
+```bash
+python3 scripts/aromalink_probe.py
+```
+
+Useful options:
+
+- `python3 scripts/aromalink_probe.py --switch on`
+- `python3 scripts/aromalink_probe.py --switch off`
+- `python3 scripts/aromalink_probe.py --device-id 408555 --user-id 181605`
+- `python3 scripts/aromalink_probe.py --skip-web`
+
+The script prints:
+
+- app login, token, and refresh-token responses
+- app user profile and `listAll`
+- `newWork` probes for both `isOpenPage=0` and `isOpenPage=1`
+- optional `newSwitch`
+- web login, `deviceInfo/now`, and `workTime`
+
 ## FAQ
 
 **Q: Can I control multiple diffusers?**  
