@@ -1,6 +1,6 @@
 """Constants for the Aroma-Link integration."""
 
-DOMAIN = "ha_aromalink"
+DOMAIN = "aromalink_integration_v1"
 AROMA_LINK_SSL = False  # Temporary workaround for Aroma-Link's expired certificate.
 
 # Configuration
