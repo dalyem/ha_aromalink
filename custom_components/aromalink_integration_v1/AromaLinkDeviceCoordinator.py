@@ -291,7 +291,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         except (TypeError, ValueError):
             return None
 
-    async def _fetch_app_device_info(self, retried=False):
+    async def _fetch_app_device_info(self, retried=False, is_open_page=0):
         """Fetch device state from the mobile app endpoint when token auth is available."""
         user_id = self.auth_coordinator.user_id
         headers = self._build_app_headers()
@@ -300,11 +300,15 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         url = (
             f"http://www.aroma-link.com/v1/app/device/newWork/{self.device_id}"
-            f"?isOpenPage=1&userId={user_id}"
+            f"?isOpenPage={is_open_page}&userId={user_id}"
         )
 
         try:
-            self._log_request("GET", url, extra=f"app_endpoint=true user_id={user_id}")
+            self._log_request(
+                "GET",
+                url,
+                extra=f"app_endpoint=true user_id={user_id} isOpenPage={is_open_page}",
+            )
             async with self.auth_coordinator.session.get(
                 url,
                 headers=headers,
@@ -334,9 +338,15 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         self.device_id,
                     )
                     if retried:
+                        if is_open_page == 0:
+                            _LOGGER.warning(
+                                "Aroma-Link retrying newWork with isOpenPage=1 for device %s.",
+                                self.device_id,
+                            )
+                            return await self._fetch_app_device_info(retried=True, is_open_page=1)
                         return None
                     if await self.auth_coordinator.async_refresh_app_auth():
-                        return await self._fetch_app_device_info(retried=True)
+                        return await self._fetch_app_device_info(retried=True, is_open_page=is_open_page)
                     return None
                 normalized = self._normalize_device_payload(payload)
                 if normalized is not None:
