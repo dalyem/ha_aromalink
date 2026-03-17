@@ -56,6 +56,14 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # If we have devices, create entry with all devices
                 if devices:
                     device_names = [d.get("deviceName", f"Device {d['deviceId']}") for d in devices]
+                    user_id = next(
+                        (
+                            str(device.get("userId") or device.get("user_id"))
+                            for device in devices
+                            if device.get("userId") or device.get("user_id")
+                        ),
+                        None,
+                    )
                     _LOGGER.info(f"Adding {len(devices)} devices: {device_names}")
                     
                     return self.async_create_entry(
@@ -63,10 +71,12 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data={
                             CONF_USERNAME: username,
                             CONF_PASSWORD: password,
+                            "user_id": user_id,
                             "devices": [
                                 {
                                     CONF_DEVICE_ID: str(device["deviceId"]),
-                                    "device_name": device.get("deviceName", f"Device {device['deviceId']}")
+                                    "device_name": device.get("deviceName", f"Device {device['deviceId']}"),
+                                    "user_id": str(device.get("userId")) if device.get("userId") else None,
                                 }
                                 for device in devices
                             ]
