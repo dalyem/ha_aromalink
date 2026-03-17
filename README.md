@@ -1,10 +1,10 @@
-# HA Aromalink Integration for Home Assistant
+# aromalink_integration_v1 for Home Assistant
 
 This custom component provides integration with Aroma-Link WiFi diffusers in Home Assistant.
 
-> **Note:** The integration appears in Home Assistant as "HA Aromalink" with the domain `ha_aromalink`
+> **Note:** The integration appears in Home Assistant as `aromalink_integration_v1` with the domain `aromalink_integration_v1`
 
-> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration`, `dalyem_aroma_link`, and `ha_aroma_link` config entries will not be reused automatically. Add `HA Aromalink` as a new integration after updating. If HACS was tracking an older folder/domain name, remove and re-add the custom repository so HACS refreshes the repository content path.
+> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration`, `dalyem_aroma_link`, and `ha_aromalink` config entries will not be reused automatically. Add `aromalink_integration_v1` as a new integration after updating. If HACS was tracking an older folder/domain name, remove and re-add the custom repository so HACS refreshes the repository content path.
 
 ![Aroma-Link logo](brand/logo.png)
 
@@ -43,7 +43,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 ### Manual Installation
 
-1. Copy the `ha_aromalink` directory to your Home Assistant `custom_components` directory
+1. Copy the `aromalink_integration_v1` directory to your Home Assistant `custom_components` directory
 
    - The directory is typically located at `<config>/custom_components/`
    - If the `custom_components` directory doesn't exist, create it
@@ -51,7 +51,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
    For example:
 
    ```bash
-   cp -r custom_components/ha_aromalink <home_assistant_config>/custom_components/
+   cp -r custom_components/aromalink_integration_v1 <home_assistant_config>/custom_components/
    ```
 
 2. Restart Home Assistant
@@ -60,7 +60,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 1. In Home Assistant, go to **Settings** → **Devices and Services**
 2. Click the **+ ADD INTEGRATION** button
-3. Search for "HA Aromalink" and select it
+3. Search for `aromalink_integration_v1` and select it
 4. Enter your Aroma-Link username and password
 5. The integration will automatically discover and add all devices in your account
 
@@ -68,7 +68,7 @@ This custom component provides integration with Aroma-Link WiFi diffusers in Hom
 
 The integration provides the following services:
 
-### `ha_aromalink.set_scheduler`
+### `aromalink_integration_v1.set_scheduler`
 
 Set the scheduler for the diffuser.
 
@@ -78,7 +78,7 @@ Parameters:
 - `week_days`: Days of the week to apply the schedule (optional, defaults to all days)
 - `device_id`: The ID of the device to control (optional, required if you have multiple devices)
 
-### `ha_aromalink.run_diffuser`
+### `aromalink_integration_v1.run_diffuser`
 
 Run the diffuser for a specific time.
 
@@ -127,7 +127,7 @@ The new auto-discovery feature eliminates the need to manually find your device 
 - Check the Home Assistant logs for debugging information
 - Make sure your diffuser is connected to your WiFi network and accessible from the internet
 - If automatic device discovery fails, you can still manually specify your device ID
-- If HACS reports `No content to download`, verify that the default branch contains `custom_components/ha_aromalink/manifest.json` and the latest integration files. If you renamed the integration folder/domain, remove and re-add the custom repository in HACS so it refreshes the cached content path
+- If HACS reports `No content to download`, verify that the default branch contains `custom_components/aromalink_integration_v1/manifest.json` and the latest integration files. If you renamed the integration folder/domain, remove and re-add the custom repository in HACS so it refreshes the cached content path
 
 ## FAQ
 
@@ -142,6 +142,7 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 ## Version History
 
+- 1.5.0: Renamed the fork to the `aromalink_integration_v1` domain and package folder
 - 1.4.0: Renamed the fork to the `ha_aromalink` domain and `HA Aromalink` display name
 - 1.3.0: Renamed the fork to the `ha_aroma_link` domain with a neutral HA-specific identity
 - 1.2.0: Renamed the fork to its own Home Assistant domain so it installs as a separate integration

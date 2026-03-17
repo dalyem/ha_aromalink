@@ -1,6 +1,6 @@
 {
-  "domain": "ha_aromalink",
-  "name": "HA Aromalink",
+  "domain": "aromalink_integration_v1",
+  "name": "aromalink_integration_v1",
   "after_dependencies": [],
   "codeowners": ["@dalyem"],
   "config_flow": true,
@@ -8,7 +8,7 @@
   "documentation": "https://github.com/dalyem/ha_aromalink#readme",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/dalyem/ha_aromalink/issues",
-  "loggers": ["custom_components.ha_aromalink"],
+  "loggers": ["custom_components.aromalink_integration_v1"],
   "requirements": [],
-  "version": "1.4.0"
+  "version": "1.5.0"
 }
