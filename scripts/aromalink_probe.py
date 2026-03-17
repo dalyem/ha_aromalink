@@ -190,6 +190,90 @@ def parse_json(text: str) -> Any | None:
         return None
 
 
+def coerce_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_count(payload: Any, *keys: str) -> int | None:
+    if not isinstance(payload, dict):
+        return None
+
+    for key in keys:
+        value = coerce_int(payload.get(key))
+        if value is not None:
+            return value
+
+    return None
+
+
+def find_device_payload(payload: Any, device_id: str | None) -> dict[str, Any] | None:
+    interesting_keys = {
+        "onCount",
+        "pumpCount",
+        "runCount",
+        "airPumpCount",
+        "on_count",
+        "pump_count",
+        "run_count",
+        "air_pump_count",
+        "openCount",
+        "startCount",
+        "pumpTimes",
+        "pump_times",
+    }
+
+    if isinstance(payload, dict):
+        payload_device_id = payload.get("deviceId") or payload.get("id")
+        if device_id and payload_device_id is not None and str(payload_device_id) == str(device_id):
+            return payload
+        if interesting_keys.intersection(payload.keys()) and (
+            device_id is None or payload_device_id is None
+        ):
+            return payload
+        for value in payload.values():
+            found = find_device_payload(value, device_id)
+            if found is not None:
+                return found
+
+    if isinstance(payload, list):
+        for item in payload:
+            found = find_device_payload(item, device_id)
+            if found is not None:
+                return found
+
+    return None
+
+
+def print_count_summary(label: str, payload: Any, device_id: str | None) -> None:
+    device_payload = find_device_payload(payload, device_id)
+    if not isinstance(device_payload, dict):
+        print(f"[{label}_counts] on_count=None pump_count=None")
+        return
+
+    on_count = extract_count(
+        device_payload,
+        "onCount",
+        "runCount",
+        "on_count",
+        "run_count",
+        "openCount",
+        "startCount",
+    )
+    pump_count = extract_count(
+        device_payload,
+        "pumpCount",
+        "airPumpCount",
+        "pump_count",
+        "air_pump_count",
+        "pumpTimes",
+        "pump_times",
+    )
+    print(f"[{label}_counts] on_count={on_count} pump_count={pump_count}")
+
+
 def print_response(label: str, response: ProbeResponse) -> Any | None:
     print(f"\n[{label}] {response.method} {response.url}")
     print(f"status: {response.status}")
@@ -319,6 +403,7 @@ def probe_app_endpoints(client: ProbeClient, config: ProbeConfig) -> tuple[str |
         headers=headers,
     )
     payload = print_response("app_device_list_all", response)
+    print_count_summary("app_device_list_all", payload, config.device_id)
     if not config.device_id and payload:
         groups = find_nested_value(payload, {"data"})
         if isinstance(groups, list):
@@ -342,7 +427,8 @@ def probe_app_endpoints(client: ProbeClient, config: ProbeConfig) -> tuple[str |
                 f"http://www.aroma-link.com/v1/app/device/newWork/{config.device_id}?isOpenPage={is_open_page}&userId={user_id}",
                 headers=headers,
             )
-            print_response(f"app_new_work_isOpenPage_{is_open_page}", response)
+            payload = print_response(f"app_new_work_isOpenPage_{is_open_page}", response)
+            print_count_summary(f"app_new_work_isOpenPage_{is_open_page}", payload, config.device_id)
 
         if config.switch_state:
             switch_body, switch_content_type = form_multipart(
@@ -401,7 +487,8 @@ def probe_web_endpoints(client: ProbeClient, config: ProbeConfig) -> None:
         "GET",
         "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order=",
     )
-    print_response("web_device_list_api", response)
+    payload = print_response("web_device_list_api", response)
+    print_count_summary("web_device_list_api", payload, config.device_id)
 
     if not config.device_id:
         return
@@ -427,7 +514,8 @@ def probe_web_endpoints(client: ProbeClient, config: ProbeConfig) -> None:
         f"https://www.aroma-link.com/device/deviceInfo/now/{config.device_id}?timeout=1000",
         headers=headers,
     )
-    print_response("web_device_info_now", response)
+    payload = print_response("web_device_info_now", response)
+    print_count_summary("web_device_info_now", payload, config.device_id)
 
     response = client.request(
         "GET",
