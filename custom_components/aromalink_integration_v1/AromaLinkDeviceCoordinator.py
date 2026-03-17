@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import timedelta
+import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .const import (
     AROMA_LINK_SSL,
@@ -72,6 +73,115 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             )
 
         return headers
+
+    def _build_app_headers(self):
+        """Build headers for the mobile app endpoints."""
+        token = self.auth_coordinator.access_token
+        if not token:
+            return None
+
+        return {
+            "User-Agent": AROMA_LINK_USER_AGENT,
+            "Access-Token": token,
+            "Authorization": f"Bearer {token}",
+        }
+
+    def _normalize_device_payload(self, payload):
+        """Normalize app or web payloads into the coordinator data shape."""
+        device_data = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
+        if not isinstance(device_data, dict):
+            return None
+
+        on_off = device_data.get("onOff")
+        if on_off is None and "state" in device_data:
+            state_value = device_data.get("state")
+            if isinstance(state_value, bool):
+                on_off = 1 if state_value else 0
+            elif str(state_value).lower() in {"1", "true", "on"}:
+                on_off = 1
+            elif str(state_value).lower() in {"0", "false", "off"}:
+                on_off = 0
+
+        return {
+            "state": on_off == 1,
+            "onOff": on_off,
+            "workStatus": device_data.get("workStatus"),
+            "workRemainTime": device_data.get("workRemainTime"),
+            "pauseRemainTime": device_data.get("pauseRemainTime"),
+            "raw_device_data": device_data,
+            "device_id": self.device_id,
+            "device_name": self.device_name,
+        }
+
+    async def _fetch_app_device_info(self):
+        """Fetch device state from the mobile app endpoint when token auth is available."""
+        user_id = self.auth_coordinator.user_id
+        headers = self._build_app_headers()
+        if not user_id or headers is None:
+            return None
+
+        url = (
+            f"http://www.aroma-link.com/v1/app/device/newWork/{self.device_id}"
+            f"?isOpenPage=1&userId={user_id}"
+        )
+
+        try:
+            async with self.auth_coordinator.session.get(
+                url,
+                headers=headers,
+                timeout=15,
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.debug(
+                        "App device info request for %s returned status %s",
+                        self.device_id,
+                        response.status,
+                    )
+                    return None
+
+                payload = await response.json(content_type=None)
+                normalized = self._normalize_device_payload(payload)
+                if normalized is None:
+                    _LOGGER.debug(
+                        "App device info response for %s did not contain recognizable data.",
+                        self.device_id,
+                    )
+                return normalized
+        except Exception as err:
+            _LOGGER.debug(
+                "App device info request failed for %s: %s",
+                self.device_id,
+                err,
+            )
+            return None
+
+    async def _app_switch(self, state_to_set):
+        """Send on/off commands to the mobile app endpoint when token auth is available."""
+        user_id = self.auth_coordinator.user_id
+        headers = self._build_app_headers()
+        if not user_id or headers is None:
+            return False
+
+        data = aiohttp.FormData()
+        data.add_field("deviceId", str(self.device_id))
+        data.add_field("onOff", "1" if state_to_set else "0")
+        data.add_field("userId", str(user_id))
+
+        try:
+            async with self.auth_coordinator.session.post(
+                "http://www.aroma-link.com/v1/app/data/newSwitch",
+                headers=headers,
+                data=data,
+                timeout=15,
+            ) as response:
+                return response.status == 200
+        except Exception as err:
+            _LOGGER.debug(
+                "App switch request failed for %s: %s",
+                self.device_id,
+                err,
+            )
+            return False
 
     async def _prime_device_session(self, jsessionid, force=False):
         """Load the device command page before calling AJAX endpoints."""
@@ -222,6 +332,10 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         try:
+            app_data = await self._fetch_app_device_info()
+            if app_data is not None:
+                return app_data
+
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
             response = await self.auth_coordinator.session.get(
@@ -321,6 +435,15 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         try:
+            if await self._app_switch(state_to_set):
+                _LOGGER.info(
+                    "Successfully commanded device %s to %s via app endpoint",
+                    self.device_id,
+                    "on" if state_to_set else "off",
+                )
+                await self.async_request_refresh()
+                return True
+
             async with self.auth_coordinator.session.post(
                 url,
                 data=data,

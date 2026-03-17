@@ -79,6 +79,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.error("No devices found in config entry")
         return False
 
+    user_id = entry.data.get("user_id") or next(
+        (device.get("user_id") for device in devices if device.get("user_id")),
+        None,
+    )
+
     _LOGGER.info(
         f"Setting up Aroma-Link integration with {len(devices)} devices")
 
@@ -86,7 +91,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     auth_coordinator = AromaLinkAuthCoordinator(
         hass,
         username=username,
-        password=password
+        password=password,
+        user_id=user_id,
     )
 
     # Force first login and initialization
