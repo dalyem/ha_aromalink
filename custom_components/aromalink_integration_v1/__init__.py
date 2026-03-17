@@ -109,17 +109,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             device_id=device_id,
             device_name=device_name
         )
+        device_coordinators[device_id] = device_coordinator
 
-        # Do first refresh for each device
+        # Try an initial refresh, but keep setup alive if the Aroma-Link API is temporarily unavailable.
         try:
-            await device_coordinator.async_config_entry_first_refresh()
-            device_coordinators[device_id] = device_coordinator
+            await device_coordinator.async_refresh()
+            if not device_coordinator.last_update_success:
+                _LOGGER.warning(
+                    "Initial refresh failed for device %s; setup will continue and retry on the next poll.",
+                    device_id,
+                )
         except Exception as e:
-            _LOGGER.error(f"Error initializing device {device_id}: {e}")
-
-    if not device_coordinators:
-        _LOGGER.error("Failed to initialize any devices")
-        return False
+            _LOGGER.warning(
+                "Error during initial refresh for device %s; setup will continue: %s",
+                device_id,
+                e,
+            )
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
