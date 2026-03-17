@@ -5,6 +5,7 @@ import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .const import (
     AROMA_LINK_SSL,
+    AROMA_LINK_TRACE_REQUESTS,
     DOMAIN,
     DEFAULT_DIFFUSE_TIME,
     DEFAULT_WORK_DURATION,
@@ -53,6 +54,27 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "device_id": self.device_id,
             "device_name": self.device_name,
         }
+
+    def _log_request(self, method, url, extra=None):
+        """Temporarily log outgoing Aroma-Link requests."""
+        if not AROMA_LINK_TRACE_REQUESTS:
+            return
+
+        suffix = f" | device_id={self.device_id}" if extra is None else f" | device_id={self.device_id} | {extra}"
+        _LOGGER.warning("Aroma-Link request: %s %s%s", method, url, suffix)
+
+    def _log_response(self, method, url, status):
+        """Temporarily log Aroma-Link responses."""
+        if not AROMA_LINK_TRACE_REQUESTS:
+            return
+
+        _LOGGER.warning(
+            "Aroma-Link response: %s %s -> %s | device_id=%s",
+            method,
+            url,
+            status,
+            self.device_id,
+        )
 
     def _build_headers(self, referer, jsessionid=None, content_type=None):
         """Build request headers for Aroma-Link device requests."""
@@ -126,11 +148,13 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         try:
+            self._log_request("GET", url, extra=f"app_endpoint=true user_id={user_id}")
             async with self.auth_coordinator.session.get(
                 url,
                 headers=headers,
                 timeout=15,
             ) as response:
+                self._log_response("GET", url, response.status)
                 if response.status != 200:
                     _LOGGER.debug(
                         "App device info request for %s returned status %s",
@@ -168,12 +192,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         data.add_field("userId", str(user_id))
 
         try:
+            self._log_request(
+                "POST",
+                "http://www.aroma-link.com/v1/app/data/newSwitch",
+                extra=f"app_endpoint=true onOff={'1' if state_to_set else '0'} user_id={user_id}",
+            )
             async with self.auth_coordinator.session.post(
                 "http://www.aroma-link.com/v1/app/data/newSwitch",
                 headers=headers,
                 data=data,
                 timeout=15,
             ) as response:
+                self._log_response("POST", "http://www.aroma-link.com/v1/app/data/newSwitch", response.status)
                 return response.status == 200
         except Exception as err:
             _LOGGER.debug(
@@ -202,12 +232,14 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         }
 
         try:
+            self._log_request("GET", url, extra="prime_device_session=true")
             async with self.auth_coordinator.session.get(
                 url,
                 headers=headers,
                 timeout=15,
                 ssl=AROMA_LINK_SSL,
             ) as response:
+                self._log_response("GET", url, response.status)
                 if response.status == 200:
                     self._primed_jsessionid = jsessionid
                 else:
@@ -268,12 +300,14 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(
                 f"Fetching work time settings for device {self.device_id} day {week_day}")
+            self._log_request("GET", url, extra=f"week_day={week_day}")
             async with self.auth_coordinator.session.get(
                 url,
                 headers=headers,
                 timeout=15,
                 ssl=AROMA_LINK_SSL,
             ) as response:
+                self._log_response("GET", url, response.status)
                 if response.status == 200:
                     response_json = await response.json()
 
@@ -338,6 +372,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
+            self._log_request("GET", url)
             response = await self.auth_coordinator.session.get(
                 url,
                 headers=headers,
@@ -345,6 +380,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 ssl=AROMA_LINK_SSL,
             )
             async with response:
+                self._log_response("GET", url, response.status)
                 if response.status == 200:
                     response_json = await response.json()
 
@@ -373,6 +409,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     raise UpdateFailed(f"Authentication error")
                 elif response.status == 503:
                     await self._prime_device_session(jsessionid, force=True)
+                    self._log_request("GET", url, extra="retry_after_503=true")
                     retry_response = await self.auth_coordinator.session.get(
                         url,
                         headers=headers,
@@ -380,6 +417,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         ssl=AROMA_LINK_SSL,
                     )
                     async with retry_response:
+                        self._log_response("GET", url, retry_response.status)
                         if retry_response.status == 200:
                             response_json = await retry_response.json()
                             if response_json.get("code") == 200 and "data" in response_json:
@@ -444,6 +482,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 await self.async_request_refresh()
                 return True
 
+            self._log_request("POST", url, extra=f"onOff={'1' if state_to_set else '0'}")
             async with self.auth_coordinator.session.post(
                 url,
                 data=data,
@@ -451,6 +490,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 timeout=10,
                 ssl=AROMA_LINK_SSL,
             ) as response:
+                self._log_response("POST", url, response.status)
                 if response.status == 200:
                     _LOGGER.info(
                         f"Successfully commanded device {self.device_id} to {'on' if state_to_set else 'off'}")
@@ -539,6 +579,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         try:
+            self._log_request("POST", url, extra=f"week_days={week_days}")
             async with self.auth_coordinator.session.post(
                 url,
                 json=payload,
@@ -546,6 +587,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 timeout=10,
                 ssl=AROMA_LINK_SSL,
             ) as response:
+                self._log_response("POST", url, response.status)
                 if response.status == 200:
                     _LOGGER.info(
                         f"Successfully set scheduler for device {self.device_id}")

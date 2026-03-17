@@ -2,6 +2,7 @@
 
 DOMAIN = "aromalink_integration_v1"
 AROMA_LINK_SSL = False  # Temporary workaround for Aroma-Link's expired certificate.
+AROMA_LINK_TRACE_REQUESTS = True  # Temporary request logging while debugging API behavior.
 
 # Configuration
 CONF_USERNAME = "username"
