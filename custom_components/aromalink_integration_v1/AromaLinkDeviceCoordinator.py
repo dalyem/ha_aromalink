@@ -25,6 +25,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         self._diffuse_time = DEFAULT_DIFFUSE_TIME
         self._work_duration = DEFAULT_WORK_DURATION
         self._pause_duration = DEFAULT_PAUSE_DURATION
+        self.data = self._default_device_data()
 
         super().__init__(
             hass,
@@ -32,6 +33,19 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             name=f"{DOMAIN}_{device_id}",
             update_interval=timedelta(minutes=1),
         )
+
+    def _default_device_data(self):
+        """Return the fallback state used before the first successful refresh."""
+        return {
+            "state": False,
+            "onOff": None,
+            "workStatus": None,
+            "workRemainTime": None,
+            "pauseRemainTime": None,
+            "raw_device_data": {},
+            "device_id": self.device_id,
+            "device_name": self.device_name,
+        }
 
     @property
     def diffuse_time(self):
@@ -185,10 +199,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     self.auth_coordinator.jsessionid = None
                     raise UpdateFailed(f"Authentication error")
                 else:
-                    _LOGGER.error(
+                    _LOGGER.warning(
                         f"Failed to fetch device {self.device_id} info, status: {response.status}")
                     raise UpdateFailed(
                         f"Error fetching device info: status {response.status}")
+        except UpdateFailed:
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching device {self.device_id} info: {e}")
             raise UpdateFailed(f"Error: {e}")
