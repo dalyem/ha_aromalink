@@ -51,8 +51,8 @@ class AromaLinkPollingIntervalNumber(NumberEntity):
         """Return integration-level device info."""
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry.entry_id}_controls")},
-            name="Aroma-Link Controls",
-            manufacturer="Aroma-Link",
+            name="Aromalink Integration Controls",
+            manufacturer="Aromalink",
             model="Integration Settings",
         )
 

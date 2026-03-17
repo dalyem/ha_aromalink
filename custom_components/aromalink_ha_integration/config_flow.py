@@ -8,7 +8,6 @@ import aiohttp
 
 from .const import (
     AROMA_LINK_SSL,
-    AROMA_LINK_TRACE_REQUESTS,
     DOMAIN,
     CONF_USERNAME,
     CONF_PASSWORD,
@@ -18,23 +17,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _log_request(method, url, extra=None):
-    """Temporarily log outgoing Aroma-Link requests during config flow."""
-    if not AROMA_LINK_TRACE_REQUESTS:
-        return
-
-    suffix = f" | {extra}" if extra else ""
-    _LOGGER.warning("Aroma-Link request: %s %s%s", method, url, suffix)
-
-
-def _log_response(method, url, status):
-    """Temporarily log Aroma-Link responses during config flow."""
-    if not AROMA_LINK_TRACE_REQUESTS:
-        return
-
-    _LOGGER.warning("Aroma-Link response: %s %s -> %s", method, url, status)
 
 class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Aroma-Link."""
@@ -63,9 +45,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input[CONF_USERNAME]
             password = user_input[CONF_PASSWORD]
-            
-            _LOGGER.debug(f"Setting up with username: {username}")
-            
+
             # Try to authenticate
             session, jsessionid, devices = await self._authenticate(username, password)
             
@@ -93,7 +73,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _LOGGER.info(f"Adding {len(devices)} devices: {device_names}")
                     
                     return self.async_create_entry(
-                        title=f"Aroma-Link ({username})",
+                        title=f"Aromalink Integration ({username})",
                         data={
                             CONF_USERNAME: username,
                             CONF_PASSWORD: password,
@@ -155,19 +135,13 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         try:
             # First, attempt login to get JSESSIONID
-            _LOGGER.debug(f"Attempting login for {username}")
-            _log_request("POST", login_url, extra="config_flow=true")
             async with session.post(
                 login_url,
                 data=data,
                 headers=headers,
                 ssl=AROMA_LINK_SSL,
             ) as response:
-                _log_response("POST", login_url, response.status)
-                _LOGGER.debug(f"Login response status: {response.status}")
-                
                 response_text = await response.text()
-                _LOGGER.debug(f"Login response body: {response_text[:200]}...")
                 
                 if response.status == 200:
                     # Try multiple methods to get the JSESSIONID cookie
@@ -222,7 +196,6 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if "JSESSIONID" in filtered_cookies:
             jsessionid_morsel = filtered_cookies["JSESSIONID"]
             jsessionid = jsessionid_morsel.value
-            _LOGGER.debug(f"Found JSESSIONID in cookie jar: {jsessionid[:5]}...")
             return jsessionid
         
         # Method 2: If not found in jar, check response headers
@@ -234,7 +207,6 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     start = cookie_header.index('JSESSIONID=') + 11
                     end = cookie_header.index(';', start) if ';' in cookie_header[start:] else len(cookie_header)
                     jsessionid = cookie_header[start:end]
-                    _LOGGER.debug(f"Extracted JSESSIONID from header: {jsessionid[:5]}...")
                     return jsessionid
                 except Exception as e:
                     _LOGGER.error(f"Error extracting JSESSIONID from header: {e}")
@@ -257,15 +229,12 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             # First do an initial page load to ensure cookies are set properly
             try:
-                _LOGGER.debug("Making initial request to device page")
-                _log_request("GET", "https://www.aroma-link.com/device/list", extra="config_flow=true")
                 async with session.get(
                     "https://www.aroma-link.com/device/list",
                     timeout=10,
                     ssl=AROMA_LINK_SSL,
                 ) as init_response:
-                    _log_response("GET", "https://www.aroma-link.com/device/list", init_response.status)
-                    _LOGGER.debug(f"Initial page request status: {init_response.status}")
+                    init_response.raise_for_status()
             except Exception as e:
                 _LOGGER.warning(f"Initial page request failed, but continuing: {e}")
             
@@ -276,20 +245,14 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "Cookie": f"languagecode={language_code}; JSESSIONID={jsessionid}"
             }
             
-            _LOGGER.debug(f"Fetching device list with URL: {device_list_url}")
-            _log_request("GET", device_list_url, extra="config_flow=true")
             async with session.get(
                 device_list_url,
                 headers=device_headers,
                 ssl=AROMA_LINK_SSL,
             ) as device_response:
-                _log_response("GET", device_list_url, device_response.status)
-                _LOGGER.debug(f"Device list response status: {device_response.status}")
-                
                 if device_response.status == 200:
                     device_response_text = await device_response.text()
-                    _LOGGER.debug(f"Device list response (first 200 chars): {device_response_text[:200]}")
-                    
+
                     try:
                         device_data = json.loads(device_response_text)
                         

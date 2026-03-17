@@ -10,7 +10,7 @@ import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import AROMA_LINK_SSL, AROMA_LINK_TRACE_REQUESTS, DOMAIN
+from .const import AROMA_LINK_SSL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 AROMA_LINK_USER_AGENT = (
@@ -53,38 +53,6 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             "user_id": self.user_id,
             "last_login": self._last_login_time,
         }
-
-    def _log_request(self, method, url, extra=None):
-        """Temporarily log outgoing Aroma-Link requests."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        suffix = f" | {extra}" if extra else ""
-        _LOGGER.warning("Aroma-Link request: %s %s%s", method, url, suffix)
-
-    def _log_response(self, method, url, status):
-        """Temporarily log Aroma-Link responses."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        _LOGGER.warning("Aroma-Link response: %s %s -> %s", method, url, status)
-
-    def _log_response_body(self, label, body):
-        """Temporarily log truncated response bodies while reverse engineering."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        preview = body if len(body) <= 1200 else f"{body[:1200]}...<truncated>"
-        _LOGGER.warning("Aroma-Link auth response body [%s] | %s", label, preview)
-
-    def _mask_token(self, token):
-        """Return a short token fingerprint for logs."""
-        if not token:
-            return None
-        token = str(token)
-        if len(token) <= 12:
-            return token
-        return f"{token[:6]}...{token[-6:]}"
 
     async def _ensure_login(self):
         """Ensure we have a valid session, login if needed."""
@@ -137,20 +105,17 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug(
                 "Attempting initial GET to aroma-link.com for cookies.")
-            self._log_request("GET", "https://www.aroma-link.com/")
             async with self.session.get(
                 "https://www.aroma-link.com/",
                 timeout=10,
                 ssl=AROMA_LINK_SSL,
             ) as initial_response:
-                self._log_response("GET", "https://www.aroma-link.com/", initial_response.status)
                 initial_response.raise_for_status()
                 _LOGGER.debug(
                     f"Initial GET successful (status {initial_response.status}).")
 
             _LOGGER.debug(
-                f"Attempting login to {login_url} as {self.username}.")
-            self._log_request("POST", login_url)
+                "Attempting Aroma-Link web login.")
             async with self.session.post(
                 login_url,
                 data=data,
@@ -158,7 +123,6 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                 timeout=10,
                 ssl=AROMA_LINK_SSL,
             ) as response:
-                self._log_response("POST", login_url, response.status)
                 response_text = await response.text()
                 _LOGGER.debug(f"Login response status: {response.status}")
                 self._update_auth_artifacts(
@@ -201,16 +165,13 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             login_form = aiohttp.FormData()
             login_form.add_field("userName", self.username)
             login_form.add_field("password", hashed_password)
-            self._log_request("POST", "http://www.aroma-link.com/v1/app/user/newLogin")
             async with self.session.post(
                 "http://www.aroma-link.com/v1/app/user/newLogin",
                 headers=base_headers,
                 data=login_form,
                 timeout=15,
             ) as response:
-                self._log_response("POST", "http://www.aroma-link.com/v1/app/user/newLogin", response.status)
                 response_text = await response.text()
-                self._log_response_body("app_new_login", response_text)
                 if response.status != 200:
                     _LOGGER.error("App login failed with status code: %s.", response.status)
                     return False
@@ -225,16 +186,13 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             token_form = aiohttp.FormData()
             token_form.add_field("userName", self.username)
             token_form.add_field("password", hashed_password)
-            self._log_request("POST", "http://www.aroma-link.com/v2/app/token")
             async with self.session.post(
                 "http://www.aroma-link.com/v2/app/token",
                 headers=base_headers,
                 data=token_form,
                 timeout=15,
             ) as response:
-                self._log_response("POST", "http://www.aroma-link.com/v2/app/token", response.status)
                 response_text = await response.text()
-                self._log_response_body("app_token", response_text)
                 if response.status != 200:
                     _LOGGER.error("App token request failed with status code: %s.", response.status)
                     return False
@@ -258,16 +216,13 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             if self.refresh_token:
                 refresh_form = aiohttp.FormData()
                 refresh_form.add_field("refreshToken", self.refresh_token)
-                self._log_request("POST", "http://www.aroma-link.com/v2/app/refresh/token")
                 async with self.session.post(
                     "http://www.aroma-link.com/v2/app/refresh/token",
                     headers=base_headers,
                     data=refresh_form,
                     timeout=15,
                 ) as response:
-                    self._log_response("POST", "http://www.aroma-link.com/v2/app/refresh/token", response.status)
                     response_text = await response.text()
-                    self._log_response_body("app_refresh_token", response_text)
                     if response.status == 200:
                         payload = self._parse_json_response(response_text, "refresh token")
                         if payload is not None:
@@ -307,8 +262,6 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         if "JSESSIONID" in filtered_cookies:
             jsessionid_morsel = filtered_cookies["JSESSIONID"]
             jsessionid = jsessionid_morsel.value
-            _LOGGER.debug(
-                f"Found JSESSIONID in cookie jar: {jsessionid[:5]}...")
             return jsessionid
 
         # Method 2: If not found in jar, check response headers
@@ -320,8 +273,6 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                     end = cookie_header.index(
                         ';', start) if ';' in cookie_header[start:] else len(cookie_header)
                     jsessionid = cookie_header[start:end]
-                    _LOGGER.debug(
-                        f"Extracted JSESSIONID from header: {jsessionid[:5]}...")
                     return jsessionid
                 except Exception as e:
                     _LOGGER.error(
@@ -398,14 +349,10 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                 self.user_id = str(user_id)
                 user_id_updated = True
 
-        if token_updated and self.access_token:
-            _LOGGER.warning(
-                "Captured Aroma-Link access token from %s | token=%s",
-                source,
-                self._mask_token(self.access_token),
-            )
+        if token_updated:
+            _LOGGER.debug("Updated Aroma-Link app access token from %s.", source)
         if user_id_updated and self.user_id:
-            _LOGGER.warning("Captured Aroma-Link user ID %s from %s.", self.user_id, source)
+            _LOGGER.debug("Updated Aroma-Link user ID from %s.", source)
 
     def _find_nested_value(self, value, keys):
         """Search nested JSON-like structures for the first matching key."""
@@ -465,11 +412,8 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         )
 
         try:
-            self._log_request("GET", profile_url)
             async with self.session.get(profile_url, headers=headers, timeout=15) as response:
-                self._log_response("GET", profile_url, response.status)
                 response_text = await response.text()
-                self._log_response_body("app_user_profile", response_text)
                 if response.status != 200:
                     _LOGGER.warning(
                         "App user profile request failed with status code: %s.",
