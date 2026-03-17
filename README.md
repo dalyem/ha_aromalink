@@ -145,6 +145,7 @@ Useful options:
 
 - `python3 scripts/aromalink_probe.py --switch on`
 - `python3 scripts/aromalink_probe.py --switch off`
+- `python3 scripts/aromalink_probe.py --set-scheduler`
 - `python3 scripts/aromalink_probe.py --device-id 408555 --user-id 181605`
 - `python3 scripts/aromalink_probe.py --skip-web`
 
@@ -154,6 +155,7 @@ The script prints:
 - app user profile and `listAll`
 - `newWork` probes for both `isOpenPage=0` and `isOpenPage=1`
 - optional `newSwitch`
+- optional scheduler write using `work=10` and `pause=800`
 - web login, `deviceInfo/now`, and `workTime`
 
 ## FAQ
@@ -169,6 +171,7 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 ## Version History
 
+- 1.5.6: Switched runtime state fallback to the working web device-list endpoints, kept app `newSwitch` for power control, kept web `workTime` and `workSet` for scheduler read/write, and added a local endpoint probe script
 - 1.5.1: Added app-auth/device-endpoint debugging and broader app response parsing
 - 1.5.0: Renamed the fork to the `aromalink_integration_v1` domain and package folder
 - 1.4.0: Renamed the fork to the `ha_aromalink` domain and `HA Aromalink` display name
