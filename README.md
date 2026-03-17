@@ -171,6 +171,8 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 ## Version History
 
+- 1.5.8: Changed the integration's default work/pause values to `10 / 90`
+- 1.5.7: Added a user-configurable polling interval option, improved post-command state consistency, added sensor fallbacks for remaining-time values, and kept runtime state/control on the confirmed working endpoints
 - 1.5.6: Switched runtime state fallback to the working web device-list endpoints, kept app `newSwitch` for power control, kept web `workTime` and `workSet` for scheduler read/write, and added a local endpoint probe script
 - 1.5.1: Added app-auth/device-endpoint debugging and broader app response parsing
 - 1.5.0: Renamed the fork to the `aromalink_integration_v1` domain and package folder

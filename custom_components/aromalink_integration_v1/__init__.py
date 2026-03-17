@@ -14,6 +14,8 @@ import voluptuous as vol
 from .const import (
     DOMAIN,
     CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL_SECONDS,
+    DEFAULT_POLL_INTERVAL_SECONDS,
     SERVICE_SET_SCHEDULER,
     SERVICE_RUN_DIFFUSER,
     ATTR_WORK_DURATION,
@@ -83,6 +85,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         (device.get("user_id") for device in devices if device.get("user_id")),
         None,
     )
+    poll_interval_seconds = entry.options.get(
+        CONF_POLL_INTERVAL_SECONDS,
+        DEFAULT_POLL_INTERVAL_SECONDS,
+    )
 
     _LOGGER.info(
         f"Setting up Aroma-Link integration with {len(devices)} devices")
@@ -113,7 +119,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hass,
             auth_coordinator=auth_coordinator,
             device_id=device_id,
-            device_name=device_name
+            device_name=device_name,
+            poll_interval_seconds=poll_interval_seconds,
         )
         device_coordinators[device_id] = device_coordinator
 
