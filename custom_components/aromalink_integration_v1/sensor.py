@@ -147,7 +147,7 @@ class AromaLinkOnCountSensor(AromaLinkSensorBase):
     def native_value(self):
         """Return the on count value."""
         raw_data = self.coordinator.data.get("raw_device_data", {})
-        return raw_data.get("onCount")
+        return raw_data.get("onCount", raw_data.get("runCount"))
 
 class AromaLinkPumpCountSensor(AromaLinkSensorBase):
     """Sensor showing the number of times the pump has operated (diffusions)."""
@@ -168,4 +168,4 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
     def native_value(self):
         """Return the pump count value."""
         raw_data = self.coordinator.data.get("raw_device_data", {})
-        return raw_data.get("pumpCount")
+        return raw_data.get("pumpCount", raw_data.get("airPumpCount"))
