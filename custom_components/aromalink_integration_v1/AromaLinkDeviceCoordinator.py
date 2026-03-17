@@ -292,6 +292,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order=",
             "https://www.aroma-link.com/device/list",
         )
+        merged_data = None
 
         headers = self._build_headers(
             referer="https://www.aroma-link.com/device/list",
@@ -325,7 +326,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
                         normalized = self._normalize_web_list_row(row)
                         if normalized is not None:
-                            return normalized
+                            merged_data = self._merge_device_data(merged_data, normalized)
+                            break
             except Exception as err:
                 _LOGGER.debug(
                     "Web list fallback request failed for %s via %s: %s",
@@ -334,7 +336,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     err,
                 )
 
-        return None
+        return merged_data
 
     def _apply_recent_switch_state(self, data):
         """Preserve recent switch commands if the next poll lacks live-state fields."""
