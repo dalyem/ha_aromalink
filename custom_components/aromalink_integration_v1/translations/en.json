@@ -18,5 +18,16 @@
     "abort": {
       "already_configured": "This Aroma-Link account is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Runtime Options",
+        "description": "Adjust polling behavior for the integration.",
+        "data": {
+          "poll_interval_seconds": "Polling interval in seconds"
+        }
+      }
+    }
   }
 }

@@ -13,6 +13,8 @@ from .const import (
     CONF_USERNAME,
     CONF_PASSWORD,
     CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL_SECONDS,
+    DEFAULT_POLL_INTERVAL_SECONDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,6 +41,12 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Return the options flow."""
+        return AromaLinkOptionsFlowHandler(config_entry)
 
     def __init__(self):
         """Initialize the config flow."""
@@ -299,3 +307,33 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error(f"Error fetching device list: {e}", exc_info=True)
             
         return devices
+
+
+class AromaLinkOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Aroma-Link options."""
+
+    def __init__(self, config_entry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage the integration options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_interval = self.config_entry.options.get(
+            CONF_POLL_INTERVAL_SECONDS,
+            DEFAULT_POLL_INTERVAL_SECONDS,
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_POLL_INTERVAL_SECONDS,
+                        default=current_interval,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=10, max=300)),
+                }
+            ),
+        )
