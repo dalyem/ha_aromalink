@@ -76,6 +76,19 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             self.device_id,
         )
 
+    def _log_response_body(self, label, body):
+        """Temporarily log truncated response bodies while reverse engineering."""
+        if not AROMA_LINK_TRACE_REQUESTS:
+            return
+
+        preview = body if len(body) <= 1200 else f"{body[:1200]}...<truncated>"
+        _LOGGER.warning(
+            "Aroma-Link response body [%s] | device_id=%s | %s",
+            label,
+            self.device_id,
+            preview,
+        )
+
     def _build_headers(self, referer, jsessionid=None, content_type=None):
         """Build request headers for Aroma-Link device requests."""
         headers = {
@@ -163,8 +176,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     )
                     return None
 
+                response_text = await response.text()
+                self._log_response_body("app_device_info", response_text)
                 payload = await response.json(content_type=None)
                 normalized = self._normalize_device_payload(payload)
+                if normalized is not None:
+                    _LOGGER.warning(
+                        "Aroma-Link normalized app device payload | device_id=%s | keys=%s | onOff=%s | workStatus=%s",
+                        self.device_id,
+                        sorted(normalized["raw_device_data"].keys()),
+                        normalized.get("onOff"),
+                        normalized.get("workStatus"),
+                    )
                 if normalized is None:
                     _LOGGER.debug(
                         "App device info response for %s did not contain recognizable data.",
@@ -204,6 +227,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 timeout=15,
             ) as response:
                 self._log_response("POST", "http://www.aroma-link.com/v1/app/data/newSwitch", response.status)
+                response_text = await response.text()
+                self._log_response_body("app_switch", response_text)
                 return response.status == 200
         except Exception as err:
             _LOGGER.debug(
@@ -309,6 +334,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             ) as response:
                 self._log_response("GET", url, response.status)
                 if response.status == 200:
+                    response_text = await response.text()
+                    self._log_response_body("web_work_time", response_text)
                     response_json = await response.json()
 
                     if response_json.get("code") == 200 and "data" in response_json and response_json["data"]:
