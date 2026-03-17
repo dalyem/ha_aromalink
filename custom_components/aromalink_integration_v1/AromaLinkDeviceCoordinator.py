@@ -166,6 +166,20 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             else device_data.get("pauseRemainSeconds")
         )
 
+        has_live_state = any(
+            value is not None
+            for value in (
+                on_off,
+                work_status,
+                work_remain_time,
+                pause_remain_time,
+                device_data.get("onCount"),
+                device_data.get("pumpCount"),
+            )
+        )
+        if not has_live_state:
+            return None
+
         return {
             "state": on_off == 1 if on_off is not None else None,
             "onOff": on_off,
@@ -198,6 +212,83 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         merged.setdefault("device_id", self.device_id)
         merged.setdefault("device_name", self.device_name)
         return merged
+
+    def _normalize_web_list_row(self, row):
+        """Normalize rows returned by /device/list or /device/list/v2."""
+        if not isinstance(row, dict):
+            return None
+
+        work_status = self._coerce_int(row.get("workStatus"))
+        on_off = self._coerce_on_off(row.get("onOff"))
+        if on_off is None and work_status is not None:
+            on_off = 0 if work_status == 0 else 1
+
+        raw_device_data = dict(row)
+        if raw_device_data.get("onCount") is None and raw_device_data.get("runCount") is not None:
+            raw_device_data["onCount"] = raw_device_data.get("runCount")
+        if raw_device_data.get("pumpCount") is None and raw_device_data.get("airPumpCount") is not None:
+            raw_device_data["pumpCount"] = raw_device_data.get("airPumpCount")
+
+        return {
+            "state": on_off == 1 if on_off is not None else None,
+            "onOff": on_off,
+            "workStatus": work_status,
+            "workRemainTime": None,
+            "pauseRemainTime": None,
+            "raw_device_data": raw_device_data,
+            "device_id": self.device_id,
+            "device_name": row.get("deviceName", self.device_name),
+        }
+
+    async def _fetch_web_list_state(self, jsessionid):
+        """Fetch device state from the device list endpoints as a fallback."""
+        endpoints = (
+            "https://www.aroma-link.com/device/list",
+            "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order=",
+        )
+
+        headers = self._build_headers(
+            referer="https://www.aroma-link.com/device/list",
+            jsessionid=jsessionid,
+        )
+
+        for url in endpoints:
+            try:
+                self._log_request("GET", url, extra="web_list_fallback=true")
+                async with self.auth_coordinator.session.get(
+                    url,
+                    headers=headers,
+                    timeout=15,
+                    ssl=AROMA_LINK_SSL,
+                ) as response:
+                    self._log_response("GET", url, response.status)
+                    if response.status != 200:
+                        continue
+
+                    response_text = await response.text()
+                    self._log_response_body("web_list_state", response_text)
+                    payload = await response.json()
+                    rows = payload.get("rows")
+                    if not isinstance(rows, list):
+                        continue
+
+                    for row in rows:
+                        row_device_id = row.get("deviceId") or row.get("id")
+                        if str(row_device_id) != str(self.device_id):
+                            continue
+
+                        normalized = self._normalize_web_list_row(row)
+                        if normalized is not None:
+                            return normalized
+            except Exception as err:
+                _LOGGER.debug(
+                    "Web list fallback request failed for %s via %s: %s",
+                    self.device_id,
+                    url,
+                    err,
+                )
+
+        return None
 
     def _apply_recent_switch_state(self, data):
         """Preserve recent switch commands if the next poll lacks live-state fields."""
@@ -349,6 +440,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         return await self._fetch_app_device_info(retried=True, is_open_page=is_open_page)
                     return None
                 normalized = self._normalize_device_payload(payload)
+                if normalized is None and is_open_page == 0:
+                    _LOGGER.warning(
+                        "Aroma-Link newWork returned no live state for device %s with isOpenPage=0; retrying with isOpenPage=1.",
+                        self.device_id,
+                    )
+                    return await self._fetch_app_device_info(retried=retried, is_open_page=1)
                 if normalized is not None:
                     _LOGGER.warning(
                         "Aroma-Link normalized app device payload | device_id=%s | keys=%s | onOff=%s | workStatus=%s",
@@ -596,6 +693,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
             if app_data is not None and app_data.get("onOff") is not None:
                 return self._apply_recent_switch_state(merged_app_data)
+
+            web_list_data = await self._fetch_web_list_state(jsessionid)
+            if web_list_data is not None:
+                return self._apply_recent_switch_state(
+                    self._merge_device_data(previous_data, app_data, web_list_data)
+                )
 
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
