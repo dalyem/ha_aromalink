@@ -10,11 +10,13 @@ CONF_PASSWORD = "password"
 CONF_DEVICE_ID = "device_id"
 CONF_DIFFUSE_TIME = "diffuse_time"
 CONF_WORK_DURATION = "work_duration"
+CONF_POLL_INTERVAL_SECONDS = "poll_interval_seconds"
 
 # Default values
 DEFAULT_DIFFUSE_TIME = 60  # seconds
 DEFAULT_WORK_DURATION = 10  # seconds
-DEFAULT_PAUSE_DURATION = 900  # seconds (15 minutes)
+DEFAULT_PAUSE_DURATION = 90  # seconds
+DEFAULT_POLL_INTERVAL_SECONDS = 60
 
 # Services
 SERVICE_SET_SCHEDULER = "set_scheduler"

@@ -24,7 +24,7 @@ AROMA_LINK_USER_AGENT = (
 class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
     """Coordinator for handling device data and control."""
 
-    def __init__(self, hass, auth_coordinator, device_id, device_name):
+    def __init__(self, hass, auth_coordinator, device_id, device_name, poll_interval_seconds):
         """Initialize the device coordinator."""
         self.hass = hass
         self.auth_coordinator = auth_coordinator
@@ -42,7 +42,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"{DOMAIN}_{device_id}",
-            update_interval=timedelta(minutes=1),
+            update_interval=timedelta(seconds=poll_interval_seconds),
         )
 
     def _default_device_data(self):
@@ -295,24 +295,33 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         if not isinstance(data, dict):
             return data
 
-        if time.monotonic() - self._last_switch_command_at > 15:
+        command_age = time.monotonic() - self._last_switch_command_at
+        if command_age > 15:
             return data
 
-        if data.get("onOff") is not None:
+        optimistic_on_off = 1 if self._last_switch_state else 0
+
+        if data.get("onOff") is not None and data.get("onOff") == optimistic_on_off:
+            return data
+
+        if data.get("onOff") is not None and command_age > 8:
             return data
 
         optimistic = dict(data)
-        optimistic["onOff"] = 1 if self._last_switch_state else 0
+        optimistic["onOff"] = optimistic_on_off
         optimistic["state"] = bool(self._last_switch_state)
         if optimistic.get("workStatus") is None:
             optimistic["workStatus"] = 1 if self._last_switch_state else 0
+        elif not self._last_switch_state:
+            optimistic["workStatus"] = 0
 
         if AROMA_LINK_TRACE_REQUESTS:
             _LOGGER.warning(
-                "Aroma-Link retained recent switch state | device_id=%s | onOff=%s | workStatus=%s",
+                "Aroma-Link retained recent switch state | device_id=%s | onOff=%s | workStatus=%s | command_age=%.1fs",
                 self.device_id,
                 optimistic["onOff"],
                 optimistic.get("workStatus"),
+                command_age,
             )
         return optimistic
 
@@ -819,7 +828,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     "enabled": 0,
                     "consistenceLevel": "1",
                     "workDuration": "10",
-                    "pauseDuration": "900"
+                    "pauseDuration": "90"
                 },
                 {
                     "startTime": "00:00",
@@ -827,7 +836,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     "enabled": 0,
                     "consistenceLevel": "1",
                     "workDuration": "10",
-                    "pauseDuration": "900"
+                    "pauseDuration": "90"
                 },
                 {
                     "startTime": "00:00",
@@ -835,7 +844,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     "enabled": 0,
                     "consistenceLevel": "1",
                     "workDuration": "10",
-                    "pauseDuration": "900"
+                    "pauseDuration": "90"
                 },
                 {
                     "startTime": "00:00",
@@ -843,7 +852,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     "enabled": 0,
                     "consistenceLevel": "1",
                     "workDuration": "10",
-                    "pauseDuration": "900"
+                    "pauseDuration": "90"
                 }
             ]
         }
@@ -873,6 +882,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     _LOGGER.info(
                         f"Successfully set scheduler for device {self.device_id}")
                     await self.async_request_refresh()
+                    self.hass.async_create_task(self._delayed_refresh())
                     return True
                 elif response.status in [401, 403]:
                     _LOGGER.warning(

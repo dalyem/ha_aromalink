@@ -106,7 +106,16 @@ class AromaLinkWorkRemainingTimeSensor(AromaLinkSensorBase):
     @property
     def native_value(self):
         """Return the remaining time in work cycle."""
-        return self.coordinator.data.get("workRemainTime")
+        value = self.coordinator.data.get("workRemainTime")
+        if value is not None:
+            return value
+
+        work_status = self.coordinator.data.get("workStatus")
+        if work_status == 1:
+            return self.coordinator.work_duration
+        if work_status == 0:
+            return 0
+        return None
 
 class AromaLinkPauseRemainingTimeSensor(AromaLinkSensorBase):
     """Sensor showing the remaining time in the current pause cycle."""
@@ -126,7 +135,16 @@ class AromaLinkPauseRemainingTimeSensor(AromaLinkSensorBase):
     @property
     def native_value(self):
         """Return the remaining time in pause cycle."""
-        return self.coordinator.data.get("pauseRemainTime")
+        value = self.coordinator.data.get("pauseRemainTime")
+        if value is not None:
+            return value
+
+        work_status = self.coordinator.data.get("workStatus")
+        if work_status == 2:
+            return self.coordinator.pause_duration
+        if work_status == 0:
+            return 0
+        return None
 
 class AromaLinkOnCountSensor(AromaLinkSensorBase):
     """Sensor showing how many times the device has been turned on."""
