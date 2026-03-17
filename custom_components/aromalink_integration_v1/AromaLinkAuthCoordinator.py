@@ -69,6 +69,23 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
 
         _LOGGER.warning("Aroma-Link response: %s %s -> %s", method, url, status)
 
+    def _log_response_body(self, label, body):
+        """Temporarily log truncated response bodies while reverse engineering."""
+        if not AROMA_LINK_TRACE_REQUESTS:
+            return
+
+        preview = body if len(body) <= 1200 else f"{body[:1200]}...<truncated>"
+        _LOGGER.warning("Aroma-Link auth response body [%s] | %s", label, preview)
+
+    def _mask_token(self, token):
+        """Return a short token fingerprint for logs."""
+        if not token:
+            return None
+        token = str(token)
+        if len(token) <= 12:
+            return token
+        return f"{token[:6]}...{token[-6:]}"
+
     async def _ensure_login(self):
         """Ensure we have a valid session, login if needed."""
         current_time = time.time()
@@ -193,6 +210,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             ) as response:
                 self._log_response("POST", "http://www.aroma-link.com/v1/app/user/newLogin", response.status)
                 response_text = await response.text()
+                self._log_response_body("app_new_login", response_text)
                 if response.status != 200:
                     _LOGGER.error("App login failed with status code: %s.", response.status)
                     return False
@@ -216,6 +234,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             ) as response:
                 self._log_response("POST", "http://www.aroma-link.com/v2/app/token", response.status)
                 response_text = await response.text()
+                self._log_response_body("app_token", response_text)
                 if response.status != 200:
                     _LOGGER.error("App token request failed with status code: %s.", response.status)
                     return False
@@ -248,6 +267,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                 ) as response:
                     self._log_response("POST", "http://www.aroma-link.com/v2/app/refresh/token", response.status)
                     response_text = await response.text()
+                    self._log_response_body("app_refresh_token", response_text)
                     if response.status == 200:
                         payload = self._parse_json_response(response_text, "refresh token")
                         if payload is not None:
@@ -326,8 +346,15 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         source="auth response",
     ):
         """Extract token-like auth artifacts from responses when present."""
-        header_names = ("Access-Token", "access-token", "accessToken", "Authorization")
-        cookie_names = ("accessToken", "access_token", "token")
+        header_names = (
+            "Access-Token",
+            "access-token",
+            "accessToken",
+            "accesstoken",
+            "Authorization",
+            "token",
+        )
+        cookie_names = ("accessToken", "access_token", "token", "Authorization")
         token_keys = {"accesstoken", "access_token", "token", "authorization"}
         user_keys = {"userid", "user_id", "uid"}
 
@@ -372,9 +399,13 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                 user_id_updated = True
 
         if token_updated and self.access_token:
-            _LOGGER.debug("Captured Aroma-Link access token from %s.", source)
+            _LOGGER.warning(
+                "Captured Aroma-Link access token from %s | token=%s",
+                source,
+                self._mask_token(self.access_token),
+            )
         if user_id_updated and self.user_id:
-            _LOGGER.debug("Captured Aroma-Link user ID %s from %s.", self.user_id, source)
+            _LOGGER.warning("Captured Aroma-Link user ID %s from %s.", self.user_id, source)
 
     def _find_nested_value(self, value, keys):
         """Search nested JSON-like structures for the first matching key."""
@@ -402,8 +433,12 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         return {
             "User-Agent": AROMA_LINK_USER_AGENT,
             "Access-Token": self.access_token,
+            "access-token": self.access_token,
             "accessToken": self.access_token,
+            "accesstoken": self.access_token,
+            "token": self.access_token,
             "Authorization": self.access_token,
+            "Bearer": self.access_token,
             "Accept": "application/json, text/plain, */*",
         }
 
@@ -434,6 +469,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             async with self.session.get(profile_url, headers=headers, timeout=15) as response:
                 self._log_response("GET", profile_url, response.status)
                 response_text = await response.text()
+                self._log_response_body("app_user_profile", response_text)
                 if response.status != 200:
                     _LOGGER.warning(
                         "App user profile request failed with status code: %s.",
