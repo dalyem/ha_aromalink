@@ -1,141 +1,118 @@
-# aromalink_integration_v1 for Home Assistant
+# Aromalink Integration for Home Assistant
 
-This custom component provides integration with Aroma-Link WiFi diffusers in Home Assistant.
+This custom component integrates Aroma-Link WiFi diffusers with Home Assistant.
 
-> **Note:** The integration appears in Home Assistant as `aromalink_integration_v1` with the domain `aromalink_integration_v1`
+> **Note:** The integration appears in Home Assistant as `Aromalink Integration` with the domain `aromalink_ha_integration`.
 
-> **Upgrade note:** Because this fork now uses its own Home Assistant domain, existing `aroma_link_integration`, `dalyem_aroma_link`, and `ha_aromalink` config entries will not be reused automatically. Add `aromalink_integration_v1` as a new integration after updating. If HACS was tracking an older folder/domain name, remove and re-add the custom repository so HACS refreshes the repository content path.
+> **1.9 upgrade note:** Version `1.9.0` rebrands the integration domain from `aromalink_integration_v1` to `aromalink_ha_integration`. Existing config entries from `aroma_link_integration`, `dalyem_aroma_link`, `ha_aromalink`, and `aromalink_integration_v1` are not migrated automatically.
 
 ![Aroma-Link logo](brand/logo.png)
 
 ## Features
 
-- Control diffuser power state (on/off)
-- Set diffuser work duration
-- Set diffuser schedules
-- Run diffuser for specific durations
-- Automatic device discovery
-- Auto-detection of devices in your Aroma-Link account
+- Control diffuser power state
+- Set diffuser work and pause durations
+- Save diffuser schedules
+- Run a diffuser immediately
+- Auto-discover all devices on your Aroma-Link account
+- Configure the polling interval from Home Assistant
+
+## Migration to 1.9.0
+
+1. Update the repository in HACS or replace the manual install folder with `custom_components/aromalink_ha_integration`.
+2. Restart Home Assistant.
+3. Add the integration named `Aromalink Integration`.
+4. Re-enter your Aroma-Link credentials and reapply any options such as the polling interval.
+5. Update automations or scripts that call `aromalink_integration_v1.*` services to use `aromalink_ha_integration.*`.
+6. Remove the old integration entry after the new one is working.
+
+If HACS still points at the old folder path, remove and re-add the custom repository so it refreshes the package metadata.
 
 ## Installation
 
 ### HACS
 
 1. Ensure HACS is installed in Home Assistant.
-
-2. Open the HACS tab.
-
-3. Click the **three dots** in the top right.
-
-4. Click **Custom repositories**
-
-5. Paste the GitHub repository URL `https://github.com/dalyem/ha_aromalink`
-
-6. Select **integration** as the type then click **ADD**
-
-7. Click on the freshly added repository in HACS.
-
-8. Click **Download**
-
-9. Restart Home Assistant
-
-> **Repository note:** HACS installs from the repository's default branch or published release. If you rename the integration folder or domain, those changes must be present on the default branch before HACS can download them.
+2. Open HACS.
+3. Click the three-dot menu in the top right.
+4. Click **Custom repositories**.
+5. Paste `https://github.com/dalyem/ha_aromalink`.
+6. Select **Integration** and add it.
+7. Open the repository entry and click **Download**.
+8. Restart Home Assistant.
 
 ### Manual Installation
 
-1. Copy the `aromalink_integration_v1` directory to your Home Assistant `custom_components` directory
+1. Copy the `aromalink_ha_integration` directory to `<config>/custom_components/`.
+2. Restart Home Assistant.
 
-   - The directory is typically located at `<config>/custom_components/`
-   - If the `custom_components` directory doesn't exist, create it
+Example:
 
-   For example:
+```bash
+cp -r custom_components/aromalink_ha_integration <home_assistant_config>/custom_components/
+```
 
-   ```bash
-   cp -r custom_components/aromalink_integration_v1 <home_assistant_config>/custom_components/
-   ```
+## Configuration
 
-2. Restart Home Assistant
-
-### Configuration
-
-1. In Home Assistant, go to **Settings** → **Devices and Services**
-2. Click the **+ ADD INTEGRATION** button
-3. Search for `aromalink_integration_v1` and select it
-4. Enter your Aroma-Link username and password
-5. The integration will automatically discover and add all devices in your account
+1. In Home Assistant, go to **Settings** -> **Devices and Services**.
+2. Click **Add Integration**.
+3. Search for `Aromalink Integration`.
+4. Enter your Aroma-Link username and password.
+5. Home Assistant will discover all supported devices on the account.
 
 ## Services
 
-The integration provides the following services:
+### `aromalink_ha_integration.set_scheduler`
 
-### `aromalink_integration_v1.set_scheduler`
-
-Set the scheduler for the diffuser.
+Set the diffuser scheduler.
 
 Parameters:
 
-- `work_duration`: Duration in seconds for the diffuser to work (required)
-- `week_days`: Days of the week to apply the schedule (optional, defaults to all days)
-- `device_id`: The ID of the device to control (optional, required if you have multiple devices)
+- `work_duration`: Required work duration in seconds.
+- `pause_duration`: Optional pause duration in seconds.
+- `week_days`: Optional list of weekdays.
+- `device_id`: Required when multiple devices exist.
 
-### `aromalink_integration_v1.run_diffuser`
+### `aromalink_ha_integration.run_diffuser`
 
-Run the diffuser for a specific time.
+Run the diffuser immediately.
 
 Parameters:
 
-- `work_duration`: Work duration in seconds for the diffuser (required)
-- `diffuse_time`: Total time in seconds for the diffuser to run (required)
-- `device_id`: The ID of the device to control (optional, required if you have multiple devices)
+- `work_duration`: Optional work duration in seconds.
+- `pause_duration`: Optional pause duration in seconds.
+- `device_id`: Required when multiple devices exist.
 
 ## Entities
 
-The integration adds the following entities:
+The integration creates:
 
-- **Switch**: Control the power state of the diffuser
-- **Button**: Send immediate commands to the diffuser
-- **Number**: Set work duration values
+- Switch entities for diffuser power
+- Button entities for run/save actions
+- Number entities for work duration, pause duration, and polling interval
+- Sensor entities for runtime and device statistics
 
-## How It Works
+## Technical Notes
 
-The integration works by:
-
-1. Connecting to the Aroma-Link account using your credentials
-2. Automatically discovering all devices in your account
-3. Setting up all devices as separate entities in Home Assistant
-4. Maintaining a shared authentication session for all devices
-
-### Auto-Discovery Feature
-
-The new auto-discovery feature eliminates the need to manually find your device ID. When setting up:
-
-1. The integration authenticates with the Aroma-Link server
-2. It requests a list of all devices registered to your account
-3. All devices are automatically added to Home Assistant
-4. Each device gets its own set of entities (switch, button, number controls)
-
-### Technical Details
-
-- The integration uses the same API as the official Aroma-Link website
-- All communication is done securely over HTTPS
-- Session management is handled with cookies and automatic re-login when needed
-- The integration checks device status every minute by default
+- The integration uses the Aroma-Link web and mobile endpoints.
+- The package polls cloud state every 60 seconds by default.
+- Authentication is maintained with both web-session and app-token flows.
 
 ## Troubleshooting
 
-- If you have issues connecting, verify that your Aroma-Link credentials are correct
-- Check the Home Assistant logs for debugging information
-- Make sure your diffuser is connected to your WiFi network and accessible from the internet
-- If automatic device discovery fails, you can still manually specify your device ID
-- If HACS reports `No content to download`, verify that the default branch contains `custom_components/aromalink_integration_v1/manifest.json` and the latest integration files. If you renamed the integration folder/domain, remove and re-add the custom repository in HACS so it refreshes the cached content path
+- Verify your Aroma-Link credentials if setup fails.
+- Confirm the diffuser is online in the Aroma-Link app.
+- If HACS reports `No content to download`, verify that `custom_components/aromalink_ha_integration/manifest.json` exists on the default branch, then remove and re-add the custom repository if needed.
+- If you are upgrading from an older domain, install the new integration first and remove the old one after confirming the new entities.
 
-### Local Endpoint Probe
+## Local Probe Script
 
-If you want to test Aroma-Link endpoints without pushing commits or updating HACS, use the standalone probe script:
+To inspect the Aroma-Link endpoints locally:
 
-1. Copy [.env.aromalink.example](/Users/dalymauldin/.t3/worktrees/ha_aromalink/auth-issues/.env.aromalink.example) to `.env.aromalink`
-2. Fill in your Aroma-Link username/password and optionally `AROMALINK_USER_ID` / `AROMALINK_DEVICE_ID`
-3. Run:
+1. Create a `.env.aromalink` file in the repository root.
+2. Add `AROMALINK_USERNAME` and `AROMALINK_PASSWORD`.
+3. Optionally add `AROMALINK_USER_ID` and `AROMALINK_DEVICE_ID`.
+4. Run:
 
 ```bash
 python3 scripts/aromalink_probe.py
@@ -149,43 +126,24 @@ Useful options:
 - `python3 scripts/aromalink_probe.py --device-id 408555 --user-id 181605`
 - `python3 scripts/aromalink_probe.py --skip-web`
 
-The script prints:
-
-- app login, token, and refresh-token responses
-- app user profile and `listAll`
-- `newWork` probes for both `isOpenPage=0` and `isOpenPage=1`
-- optional `newSwitch`
-- optional scheduler write using `work=10` and `pause=800`
-- web login, `deviceInfo/now`, and `workTime`
-
-## FAQ
-
-**Q: Can I control multiple diffusers?**  
-A: Yes! The integration now automatically discovers and adds all diffusers in your Aroma-Link account. Each diffuser gets its own set of entities in Home Assistant. When using service calls, you can specify which device to control using the `device_id` parameter, or leave it blank to use the first device if you only have one.
-
-**Q: Why is my diffuser showing as offline?**  
-A: Make sure your diffuser is connected to WiFi and properly set up in the Aroma-Link app.
-
-**Q: How do I find my device ID?**  
-A: You don't need to! The integration automatically discovers your devices and lets you select which one to use from a list.
-
 ## Version History
 
-- 1.5.8: Changed the integration's default work/pause values to `10 / 90`
-- 1.5.7: Added a user-configurable polling interval option, improved post-command state consistency, added sensor fallbacks for remaining-time values, and kept runtime state/control on the confirmed working endpoints
-- 1.5.6: Switched runtime state fallback to the working web device-list endpoints, kept app `newSwitch` for power control, kept web `workTime` and `workSet` for scheduler read/write, and added a local endpoint probe script
-- 1.5.1: Added app-auth/device-endpoint debugging and broader app response parsing
-- 1.5.0: Renamed the fork to the `aromalink_integration_v1` domain and package folder
-- 1.4.0: Renamed the fork to the `ha_aromalink` domain and `HA Aromalink` display name
-- 1.3.0: Renamed the fork to the `ha_aroma_link` domain with a neutral HA-specific identity
-- 1.2.0: Renamed the fork to its own Home Assistant domain so it installs as a separate integration
-- 1.1.0: Updated to support HACS integration
-- 1.0.0: Initial release with automatic device discovery
+- `1.9.0`: Rebranded to the `aromalink_ha_integration` domain and `Aromalink Integration` name, added migration guidance, and removed secret-adjacent debug logging
+- `1.5.8`: Changed the default work/pause values to `10 / 90`
+- `1.5.7`: Added a user-configurable polling interval option and improved runtime consistency
+- `1.5.6`: Switched runtime fallback to the working web device-list endpoints and added the local probe script
+- `1.5.1`: Added broader app response parsing
+- `1.5.0`: Renamed the fork to the `aromalink_integration_v1` domain and package folder
+- `1.4.0`: Renamed the fork to the `ha_aromalink` domain and display name
+- `1.3.0`: Renamed the fork to the `ha_aroma_link` domain
+- `1.2.0`: Renamed the fork to its own Home Assistant domain
+- `1.1.0`: Updated to support HACS integration
+- `1.0.0`: Initial release with automatic device discovery
 
 ## Requirements
 
 - A valid Aroma-Link account
-- At least one registered diffuser device
+- At least one registered diffuser
 - Home Assistant 2023.3.0 or newer
 - An active internet connection
 

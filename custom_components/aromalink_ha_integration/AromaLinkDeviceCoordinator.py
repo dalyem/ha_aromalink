@@ -6,7 +6,6 @@ import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .const import (
     AROMA_LINK_SSL,
-    AROMA_LINK_TRACE_REQUESTS,
     DOMAIN,
     DEFAULT_DIFFUSE_TIME,
     DEFAULT_WORK_DURATION,
@@ -59,38 +58,16 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         }
 
     def _log_request(self, method, url, extra=None):
-        """Temporarily log outgoing Aroma-Link requests."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        suffix = f" | device_id={self.device_id}" if extra is None else f" | device_id={self.device_id} | {extra}"
-        _LOGGER.warning("Aroma-Link request: %s %s%s", method, url, suffix)
+        """Retained for compatibility with earlier debug-only call sites."""
+        return
 
     def _log_response(self, method, url, status):
-        """Temporarily log Aroma-Link responses."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        _LOGGER.warning(
-            "Aroma-Link response: %s %s -> %s | device_id=%s",
-            method,
-            url,
-            status,
-            self.device_id,
-        )
+        """Retained for compatibility with earlier debug-only call sites."""
+        return
 
     def _log_response_body(self, label, body):
-        """Temporarily log truncated response bodies while reverse engineering."""
-        if not AROMA_LINK_TRACE_REQUESTS:
-            return
-
-        preview = body if len(body) <= 1200 else f"{body[:1200]}...<truncated>"
-        _LOGGER.warning(
-            "Aroma-Link response body [%s] | device_id=%s | %s",
-            label,
-            self.device_id,
-            preview,
-        )
+        """Retained for compatibility with earlier debug-only call sites."""
+        return
 
     def _build_headers(self, referer, jsessionid=None, content_type=None):
         """Build request headers for Aroma-Link device requests."""
@@ -363,14 +340,6 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         elif not self._last_switch_state:
             optimistic["workStatus"] = 0
 
-        if AROMA_LINK_TRACE_REQUESTS:
-            _LOGGER.warning(
-                "Aroma-Link retained recent switch state | device_id=%s | onOff=%s | workStatus=%s | command_age=%.1fs",
-                self.device_id,
-                optimistic["onOff"],
-                optimistic.get("workStatus"),
-                command_age,
-            )
         return optimistic
 
     async def _delayed_refresh(self, delay_seconds=3):
@@ -494,12 +463,6 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 response_text = await response.text()
                 self._log_response_body("app_device_info", response_text)
                 payload = await response.json(content_type=None)
-                if AROMA_LINK_TRACE_REQUESTS:
-                    _LOGGER.warning(
-                        "Aroma-Link parsed app device payload | device_id=%s | %r",
-                        self.device_id,
-                        payload,
-                    )
                 if self._payload_has_app_auth_error(payload):
                     _LOGGER.warning(
                         "Aroma-Link app token rejected for device %s; refreshing app auth.",
@@ -524,23 +487,10 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     )
                     return await self._fetch_app_device_info(retried=retried, is_open_page=1)
                 if normalized is not None:
-                    _LOGGER.warning(
-                        "Aroma-Link normalized app device payload | device_id=%s | keys=%s | onOff=%s | workStatus=%s",
+                    _LOGGER.debug(
+                        "Normalized app device payload for %s with keys: %s",
                         self.device_id,
                         sorted(normalized["raw_device_data"].keys()),
-                        normalized.get("onOff"),
-                        normalized.get("workStatus"),
-                    )
-                    if AROMA_LINK_TRACE_REQUESTS:
-                        _LOGGER.warning(
-                            "Aroma-Link app coordinator data | device_id=%s | %r",
-                            self.device_id,
-                            normalized,
-                        )
-                elif AROMA_LINK_TRACE_REQUESTS:
-                    _LOGGER.warning(
-                        "Aroma-Link app payload did not normalize | device_id=%s",
-                        self.device_id,
                     )
                 if normalized is None:
                     _LOGGER.debug(
@@ -810,12 +760,6 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 self._last_switch_command_at = time.monotonic()
                 self._last_switch_state = state_to_set
                 self.async_set_updated_data(optimistic_data)
-                if AROMA_LINK_TRACE_REQUESTS:
-                    _LOGGER.warning(
-                        "Aroma-Link optimistic switch state | device_id=%s | %r",
-                        self.device_id,
-                        optimistic_data,
-                    )
 
                 _LOGGER.info(
                     "Successfully commanded device %s to %s via app endpoint",

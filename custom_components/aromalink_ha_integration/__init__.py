@@ -1,6 +1,5 @@
-"""The Aroma-Link integration."""
+"""The Aromalink Integration."""
 import logging
-from datetime import timedelta
 
 from .AromaLinkAuthCoordinator import AromaLinkAuthCoordinator
 from .AromaLinkDeviceCoordinator import AromaLinkDeviceCoordinator
@@ -57,12 +56,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
-
-
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the Aroma-Link component."""
-    hass.data.setdefault(DOMAIN, {})
-    return True
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry):
