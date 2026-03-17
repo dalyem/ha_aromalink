@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from datetime import timedelta
 import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -33,6 +34,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         self._work_duration = DEFAULT_WORK_DURATION
         self._pause_duration = DEFAULT_PAUSE_DURATION
         self._primed_jsessionid = None
+        self._last_switch_command_at = 0.0
+        self._last_switch_state = None
         self.data = self._default_device_data()
 
         super().__init__(
@@ -163,7 +166,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         return {
-            "state": on_off == 1 if on_off is not None else False,
+            "state": on_off == 1 if on_off is not None else None,
             "onOff": on_off,
             "workStatus": work_status,
             "workRemainTime": work_remain_time,
@@ -172,6 +175,59 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "device_id": self.device_id,
             "device_name": self.device_name,
         }
+
+    def _merge_device_data(self, *sources):
+        """Merge normalized device payloads without wiping known state with nulls."""
+        merged = self._default_device_data()
+
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+
+            for key, value in source.items():
+                if key == "raw_device_data":
+                    if isinstance(value, dict) and value:
+                        merged[key] = {**merged.get(key, {}), **value}
+                    continue
+
+                if value is not None:
+                    merged[key] = value
+
+        merged["state"] = bool(merged.get("onOff")) if merged.get("onOff") is not None else bool(merged.get("state"))
+        merged.setdefault("device_id", self.device_id)
+        merged.setdefault("device_name", self.device_name)
+        return merged
+
+    def _apply_recent_switch_state(self, data):
+        """Preserve recent switch commands if the next poll lacks live-state fields."""
+        if not isinstance(data, dict):
+            return data
+
+        if time.monotonic() - self._last_switch_command_at > 15:
+            return data
+
+        if data.get("onOff") is not None:
+            return data
+
+        optimistic = dict(data)
+        optimistic["onOff"] = 1 if self._last_switch_state else 0
+        optimistic["state"] = bool(self._last_switch_state)
+        if optimistic.get("workStatus") is None:
+            optimistic["workStatus"] = 1 if self._last_switch_state else 0
+
+        if AROMA_LINK_TRACE_REQUESTS:
+            _LOGGER.warning(
+                "Aroma-Link retained recent switch state | device_id=%s | onOff=%s | workStatus=%s",
+                self.device_id,
+                optimistic["onOff"],
+                optimistic.get("workStatus"),
+            )
+        return optimistic
+
+    async def _delayed_refresh(self, delay_seconds=3):
+        """Refresh later so optimistic state is not immediately wiped by stale data."""
+        await asyncio.sleep(delay_seconds)
+        await self.async_request_refresh()
 
     def _find_candidate_device_data(self, payload):
         """Find the nested object most likely to contain device state."""
@@ -265,6 +321,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 response_text = await response.text()
                 self._log_response_body("app_device_info", response_text)
                 payload = await response.json(content_type=None)
+                if AROMA_LINK_TRACE_REQUESTS:
+                    _LOGGER.warning(
+                        "Aroma-Link parsed app device payload | device_id=%s | %r",
+                        self.device_id,
+                        payload,
+                    )
                 normalized = self._normalize_device_payload(payload)
                 if normalized is not None:
                     _LOGGER.warning(
@@ -273,6 +335,17 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         sorted(normalized["raw_device_data"].keys()),
                         normalized.get("onOff"),
                         normalized.get("workStatus"),
+                    )
+                    if AROMA_LINK_TRACE_REQUESTS:
+                        _LOGGER.warning(
+                            "Aroma-Link app coordinator data | device_id=%s | %r",
+                            self.device_id,
+                            normalized,
+                        )
+                elif AROMA_LINK_TRACE_REQUESTS:
+                    _LOGGER.warning(
+                        "Aroma-Link app payload did not normalize | device_id=%s",
+                        self.device_id,
                     )
                 if normalized is None:
                     _LOGGER.debug(
@@ -480,8 +553,11 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         try:
             app_data = await self._fetch_app_device_info()
-            if app_data is not None:
-                return app_data
+            previous_data = self.data if isinstance(self.data, dict) else self._default_device_data()
+            merged_app_data = self._merge_device_data(previous_data, app_data)
+
+            if app_data is not None and app_data.get("onOff") is not None:
+                return self._apply_recent_switch_state(merged_app_data)
 
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
@@ -499,9 +575,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
                     if response_json.get("code") == 200 and "data" in response_json:
                         device_data = response_json["data"]
-                        is_on = device_data.get("onOff") == 1
-                        return {
-                            "state": is_on,
+                        web_data = {
+                            "state": device_data.get("onOff") == 1,
                             "onOff": device_data.get("onOff"),
                             "workStatus": device_data.get("workStatus"),
                             "workRemainTime": device_data.get("workRemainTime"),
@@ -510,6 +585,9 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                             "device_id": self.device_id,
                             "device_name": self.device_name
                         }
+                        return self._apply_recent_switch_state(
+                            self._merge_device_data(previous_data, app_data, web_data)
+                        )
                     else:
                         error_msg = response_json.get("msg", "Unknown error")
                         _LOGGER.error(
@@ -535,9 +613,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                             response_json = await retry_response.json()
                             if response_json.get("code") == 200 and "data" in response_json:
                                 device_data = response_json["data"]
-                                is_on = device_data.get("onOff") == 1
-                                return {
-                                    "state": is_on,
+                                web_data = {
+                                    "state": device_data.get("onOff") == 1,
                                     "onOff": device_data.get("onOff"),
                                     "workStatus": device_data.get("workStatus"),
                                     "workRemainTime": device_data.get("workRemainTime"),
@@ -546,23 +623,32 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                                     "device_id": self.device_id,
                                     "device_name": self.device_name,
                                 }
+                                return self._apply_recent_switch_state(
+                                    self._merge_device_data(previous_data, app_data, web_data)
+                                )
 
                     _LOGGER.warning(
                         "Failed to fetch device %s info after retry, status: %s",
                         self.device_id,
                         retry_response.status,
                     )
+                    if app_data is not None:
+                        return self._apply_recent_switch_state(merged_app_data)
                     raise UpdateFailed(
                         f"Error fetching device info: status {retry_response.status}"
                     )
                 else:
                     _LOGGER.warning(
                         f"Failed to fetch device {self.device_id} info, status: {response.status}")
+                    if app_data is not None:
+                        return self._apply_recent_switch_state(merged_app_data)
                     raise UpdateFailed(
                         f"Error fetching device info: status {response.status}")
         except UpdateFailed:
             raise
         except Exception as e:
+            if app_data is not None:
+                return self._apply_recent_switch_state(merged_app_data)
             _LOGGER.error(f"Error fetching device {self.device_id} info: {e}")
             raise UpdateFailed(f"Error: {e}")
 
@@ -594,14 +680,22 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     optimistic_data["workStatus"] = 0
                 elif optimistic_data.get("workStatus") is None:
                     optimistic_data["workStatus"] = 1
-                self.data = optimistic_data
+                self._last_switch_command_at = time.monotonic()
+                self._last_switch_state = state_to_set
+                self.async_set_updated_data(optimistic_data)
+                if AROMA_LINK_TRACE_REQUESTS:
+                    _LOGGER.warning(
+                        "Aroma-Link optimistic switch state | device_id=%s | %r",
+                        self.device_id,
+                        optimistic_data,
+                    )
 
                 _LOGGER.info(
                     "Successfully commanded device %s to %s via app endpoint",
                     self.device_id,
                     "on" if state_to_set else "off",
                 )
-                await self.async_request_refresh()
+                self.hass.async_create_task(self._delayed_refresh())
                 return True
 
             self._log_request("POST", url, extra=f"onOff={'1' if state_to_set else '0'}")
@@ -616,7 +710,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 if response.status == 200:
                     _LOGGER.info(
                         f"Successfully commanded device {self.device_id} to {'on' if state_to_set else 'off'}")
-                    await self.async_request_refresh()
+                    self._last_switch_command_at = time.monotonic()
+                    self._last_switch_state = state_to_set
+                    optimistic_data = self._merge_device_data(
+                        self.data,
+                        {
+                            "state": state_to_set,
+                            "onOff": 1 if state_to_set else 0,
+                            "workStatus": 1 if state_to_set else 0,
+                        },
+                    )
+                    self.async_set_updated_data(optimistic_data)
+                    self.hass.async_create_task(self._delayed_refresh())
                     return True
                 elif response.status in [401, 403]:
                     _LOGGER.warning(
@@ -710,7 +815,11 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 ssl=AROMA_LINK_SSL,
             ) as response:
                 self._log_response("POST", url, response.status)
+                response_text = await response.text()
+                self._log_response_body("web_work_set", response_text)
                 if response.status == 200:
+                    self._work_duration = work_duration
+                    self._pause_duration = pause_duration
                     _LOGGER.info(
                         f"Successfully set scheduler for device {self.device_id}")
                     await self.async_request_refresh()
