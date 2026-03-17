@@ -11,6 +11,11 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+AROMA_LINK_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/91.0.4472.124 Safari/537.36"
+)
 
 
 class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
@@ -25,6 +30,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         self._diffuse_time = DEFAULT_DIFFUSE_TIME
         self._work_duration = DEFAULT_WORK_DURATION
         self._pause_duration = DEFAULT_PAUSE_DURATION
+        self._primed_jsessionid = None
         self.data = self._default_device_data()
 
         super().__init__(
@@ -46,6 +52,66 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "device_id": self.device_id,
             "device_name": self.device_name,
         }
+
+    def _build_headers(self, referer, jsessionid=None, content_type=None):
+        """Build request headers for Aroma-Link device requests."""
+        headers = {
+            "User-Agent": AROMA_LINK_USER_AGENT,
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": "https://www.aroma-link.com",
+            "Referer": referer,
+        }
+
+        if content_type:
+            headers["Content-Type"] = content_type
+
+        if jsessionid and not jsessionid.startswith("temp_"):
+            headers["Cookie"] = (
+                f"languagecode={self.auth_coordinator.language_code}; "
+                f"JSESSIONID={jsessionid}"
+            )
+
+        return headers
+
+    async def _prime_device_session(self, jsessionid, force=False):
+        """Load the device command page before calling AJAX endpoints."""
+        if not jsessionid or jsessionid.startswith("temp_"):
+            return
+
+        if not force and self._primed_jsessionid == jsessionid:
+            return
+
+        url = f"https://www.aroma-link.com/device/command/{self.device_id}"
+        headers = {
+            "User-Agent": AROMA_LINK_USER_AGENT,
+            "Referer": "https://www.aroma-link.com/device/list",
+            "Cookie": (
+                f"languagecode={self.auth_coordinator.language_code}; "
+                f"JSESSIONID={jsessionid}"
+            ),
+        }
+
+        try:
+            async with self.auth_coordinator.session.get(
+                url,
+                headers=headers,
+                timeout=15,
+                ssl=AROMA_LINK_SSL,
+            ) as response:
+                if response.status == 200:
+                    self._primed_jsessionid = jsessionid
+                else:
+                    _LOGGER.debug(
+                        "Device command page prime for %s returned status %s",
+                        self.device_id,
+                        response.status,
+                    )
+        except Exception as err:
+            _LOGGER.debug(
+                "Device command page prime failed for %s: %s",
+                self.device_id,
+                err,
+            )
 
     @property
     def diffuse_time(self):
@@ -83,15 +149,11 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         jsessionid = self.auth_coordinator.jsessionid
 
         url = f"https://www.aroma-link.com/device/workTime/{self.device_id}?week={week_day}"
-
-        headers = {
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
-
-        if jsessionid and not jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
+        await self._prime_device_session(jsessionid)
+        headers = self._build_headers(
+            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
+            jsessionid=jsessionid,
+        )
 
         try:
             _LOGGER.debug(
@@ -121,7 +183,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                                     "week_day": week_day
                                 }
 
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         f"No enabled work time settings found for device {self.device_id}")
                     return None
                 elif response.status in [401, 403]:
@@ -153,25 +215,22 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         url = f"https://www.aroma-link.com/device/deviceInfo/now/{self.device_id}?timeout=1000"
 
-        headers = {
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
-
-        # Only add Cookie header if we have a valid JSESSIONID
-        if jsessionid and not jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
+        await self._prime_device_session(jsessionid)
+        headers = self._build_headers(
+            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
+            jsessionid=jsessionid,
+        )
 
         try:
             _LOGGER.debug(
                 f"Fetching info for device {self.device_id} from: {url}")
-            async with self.auth_coordinator.session.get(
+            response = await self.auth_coordinator.session.get(
                 url,
                 headers=headers,
                 timeout=15,
                 ssl=AROMA_LINK_SSL,
-            ) as response:
+            )
+            async with response:
                 if response.status == 200:
                     response_json = await response.json()
 
@@ -198,6 +257,39 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         f"Authentication error ({response.status}) for device {self.device_id}. Forcing re-login.")
                     self.auth_coordinator.jsessionid = None
                     raise UpdateFailed(f"Authentication error")
+                elif response.status == 503:
+                    await self._prime_device_session(jsessionid, force=True)
+                    retry_response = await self.auth_coordinator.session.get(
+                        url,
+                        headers=headers,
+                        timeout=15,
+                        ssl=AROMA_LINK_SSL,
+                    )
+                    async with retry_response:
+                        if retry_response.status == 200:
+                            response_json = await retry_response.json()
+                            if response_json.get("code") == 200 and "data" in response_json:
+                                device_data = response_json["data"]
+                                is_on = device_data.get("onOff") == 1
+                                return {
+                                    "state": is_on,
+                                    "onOff": device_data.get("onOff"),
+                                    "workStatus": device_data.get("workStatus"),
+                                    "workRemainTime": device_data.get("workRemainTime"),
+                                    "pauseRemainTime": device_data.get("pauseRemainTime"),
+                                    "raw_device_data": device_data,
+                                    "device_id": self.device_id,
+                                    "device_name": self.device_name,
+                                }
+
+                    _LOGGER.warning(
+                        "Failed to fetch device %s info after retry, status: %s",
+                        self.device_id,
+                        retry_response.status,
+                    )
+                    raise UpdateFailed(
+                        f"Error fetching device info: status {retry_response.status}"
+                    )
                 else:
                     _LOGGER.warning(
                         f"Failed to fetch device {self.device_id} info, status: {response.status}")
@@ -221,15 +313,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "onOff": 1 if state_to_set else 0
         }
 
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
-
-        if jsessionid and not jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
+        await self._prime_device_session(jsessionid)
+        headers = self._build_headers(
+            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
+            jsessionid=jsessionid,
+            content_type="application/x-www-form-urlencoded; charset=UTF-8",
+        )
 
         try:
             async with self.auth_coordinator.session.post(
@@ -319,15 +408,12 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             ]
         }
 
-        headers = {
-            "Content-Type": "application/json;charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.aroma-link.com",
-            "Referer": f"https://www.aroma-link.com/device/command/{self.device_id}",
-        }
-
-        if jsessionid and not jsessionid.startswith("temp_"):
-            headers["Cookie"] = f"languagecode={self.auth_coordinator.language_code}; JSESSIONID={jsessionid}"
+        await self._prime_device_session(jsessionid)
+        headers = self._build_headers(
+            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
+            jsessionid=jsessionid,
+            content_type="application/json;charset=UTF-8",
+        )
 
         try:
             async with self.auth_coordinator.session.post(
