@@ -65,6 +65,11 @@ async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry):
+    """Reload the entry when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Aroma-Link from a config entry."""
     username = entry.data[CONF_USERNAME]
@@ -144,6 +149,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "auth_coordinator": auth_coordinator,
         "device_coordinators": device_coordinators,
     }
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     # Register services
     async def set_scheduler_service(call: ServiceCall):

@@ -8,6 +8,8 @@ from .const import (
     DEFAULT_DIFFUSE_TIME,
     DEFAULT_WORK_DURATION,
     DEFAULT_PAUSE_DURATION,
+    CONF_POLL_INTERVAL_SECONDS,
+    DEFAULT_POLL_INTERVAL_SECONDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,7 +19,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
     device_coordinators = data["device_coordinators"]
     
-    entities = []
+    entities = [AromaLinkPollingIntervalNumber(hass, entry)]
     for device_id, coordinator in device_coordinators.items():
         device_info = coordinator.get_device_info()
         # Fetch current settings
@@ -26,6 +28,52 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(AromaLinkPauseDurationNumber(coordinator, entry, device_id, device_info["name"]))
     
     async_add_entities(entities)
+
+
+class AromaLinkPollingIntervalNumber(NumberEntity):
+    """Representation of the integration polling interval."""
+
+    def __init__(self, hass, entry):
+        """Initialize the polling interval entity."""
+        self.hass = hass
+        self._entry = entry
+        self._attr_name = "Polling Interval"
+        self._attr_unique_id = f"{entry.entry_id}_poll_interval"
+        self._attr_icon = "mdi:timer-cog-outline"
+        self._attr_native_min_value = 10
+        self._attr_native_max_value = 300
+        self._attr_native_step = 10
+        self._attr_native_unit_of_measurement = "seconds"
+        self._attr_mode = "box"
+
+    @property
+    def device_info(self):
+        """Return integration-level device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry.entry_id}_controls")},
+            name="Aroma-Link Controls",
+            manufacturer="Aroma-Link",
+            model="Integration Settings",
+        )
+
+    @property
+    def native_value(self):
+        """Return the current polling interval."""
+        return self._entry.options.get(
+            CONF_POLL_INTERVAL_SECONDS,
+            DEFAULT_POLL_INTERVAL_SECONDS,
+        )
+
+    async def async_set_native_value(self, value):
+        """Persist a new polling interval."""
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            options={
+                **self._entry.options,
+                CONF_POLL_INTERVAL_SECONDS: int(value),
+            },
+        )
+        self.async_write_ha_state()
 
 class AromaLinkDiffuseTimeNumber(NumberEntity):
     """Representation of an Aroma-Link diffuse time setting."""
