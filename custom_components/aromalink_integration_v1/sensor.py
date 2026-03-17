@@ -61,6 +61,23 @@ class AromaLinkSensorBase(CoordinatorEntity, SensorEntity):
             model="Diffuser",
         )
 
+    def _get_raw_count(self, *keys):
+        """Return the first numeric count available from normalized raw data."""
+        raw_data = self.coordinator.data.get("raw_device_data", {})
+        if not isinstance(raw_data, dict):
+            return None
+
+        for key in keys:
+            value = raw_data.get(key)
+            if value is None:
+                continue
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                continue
+
+        return None
+
 class AromaLinkWorkStatusSensor(AromaLinkSensorBase):
     """Sensor showing the current work status."""
 
@@ -164,8 +181,16 @@ class AromaLinkOnCountSensor(AromaLinkSensorBase):
     @property
     def native_value(self):
         """Return the on count value."""
-        raw_data = self.coordinator.data.get("raw_device_data", {})
-        return raw_data.get("onCount", raw_data.get("runCount"))
+        return self._get_raw_count(
+            "onCount",
+            "runCount",
+            "on_count",
+            "run_count",
+            "openCount",
+            "open_count",
+            "startCount",
+            "start_count",
+        )
 
 class AromaLinkPumpCountSensor(AromaLinkSensorBase):
     """Sensor showing the number of times the pump has operated (diffusions)."""
@@ -185,5 +210,11 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
     @property
     def native_value(self):
         """Return the pump count value."""
-        raw_data = self.coordinator.data.get("raw_device_data", {})
-        return raw_data.get("pumpCount", raw_data.get("airPumpCount"))
+        return self._get_raw_count(
+            "pumpCount",
+            "airPumpCount",
+            "pump_count",
+            "air_pump_count",
+            "pumpTimes",
+            "pump_times",
+        )

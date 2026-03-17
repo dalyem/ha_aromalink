@@ -165,6 +165,26 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             if "pauseRemainTime" in device_data
             else device_data.get("pauseRemainSeconds")
         )
+        on_count = self._extract_count(
+            device_data,
+            "onCount",
+            "runCount",
+            "on_count",
+            "run_count",
+            "openCount",
+            "open_count",
+            "startCount",
+            "start_count",
+        )
+        pump_count = self._extract_count(
+            device_data,
+            "pumpCount",
+            "airPumpCount",
+            "pump_count",
+            "air_pump_count",
+            "pumpTimes",
+            "pump_times",
+        )
 
         has_live_state = any(
             value is not None
@@ -173,12 +193,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 work_status,
                 work_remain_time,
                 pause_remain_time,
-                device_data.get("onCount"),
-                device_data.get("pumpCount"),
+                on_count,
+                pump_count,
             )
         )
         if not has_live_state:
             return None
+
+        raw_device_data = dict(device_data)
+        if raw_device_data.get("onCount") is None and on_count is not None:
+            raw_device_data["onCount"] = on_count
+        if raw_device_data.get("pumpCount") is None and pump_count is not None:
+            raw_device_data["pumpCount"] = pump_count
 
         return {
             "state": on_off == 1 if on_off is not None else None,
@@ -186,7 +212,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "workStatus": work_status,
             "workRemainTime": work_remain_time,
             "pauseRemainTime": pause_remain_time,
-            "raw_device_data": device_data,
+            "raw_device_data": raw_device_data,
             "device_id": self.device_id,
             "device_name": self.device_name,
         }
@@ -224,10 +250,30 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             on_off = 0 if work_status == 0 else 1
 
         raw_device_data = dict(row)
-        if raw_device_data.get("onCount") is None and raw_device_data.get("runCount") is not None:
-            raw_device_data["onCount"] = raw_device_data.get("runCount")
-        if raw_device_data.get("pumpCount") is None and raw_device_data.get("airPumpCount") is not None:
-            raw_device_data["pumpCount"] = raw_device_data.get("airPumpCount")
+        on_count = self._extract_count(
+            row,
+            "onCount",
+            "runCount",
+            "on_count",
+            "run_count",
+            "openCount",
+            "open_count",
+            "startCount",
+            "start_count",
+        )
+        pump_count = self._extract_count(
+            row,
+            "pumpCount",
+            "airPumpCount",
+            "pump_count",
+            "air_pump_count",
+            "pumpTimes",
+            "pump_times",
+        )
+        if raw_device_data.get("onCount") is None and on_count is not None:
+            raw_device_data["onCount"] = on_count
+        if raw_device_data.get("pumpCount") is None and pump_count is not None:
+            raw_device_data["pumpCount"] = pump_count
 
         return {
             "state": on_off == 1 if on_off is not None else None,
@@ -347,6 +393,14 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "pauseRemainSeconds",
             "onCount",
             "pumpCount",
+            "runCount",
+            "airPumpCount",
+            "on_count",
+            "pump_count",
+            "run_count",
+            "air_pump_count",
+            "openCount",
+            "startCount",
         }
 
         if isinstance(payload, dict):
@@ -390,6 +444,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             return int(value)
         except (TypeError, ValueError):
             return None
+
+    def _extract_count(self, payload, *keys):
+        """Return the first integer count found for the provided keys."""
+        if not isinstance(payload, dict):
+            return None
+
+        for key in keys:
+            value = self._coerce_int(payload.get(key))
+            if value is not None:
+                return value
+
+        return None
 
     async def _fetch_app_device_info(self, retried=False, is_open_page=0):
         """Fetch device state from the mobile app endpoint when token auth is available."""
