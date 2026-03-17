@@ -114,15 +114,16 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
     def _build_app_headers(self):
         """Build headers for the mobile app endpoints."""
-        token = self.auth_coordinator.access_token
-        if not token:
-            return None
+        return self.auth_coordinator._app_auth_headers()
 
-        return {
-            "User-Agent": AROMA_LINK_USER_AGENT,
-            "Access-Token": token,
-            "Authorization": f"Bearer {token}",
-        }
+    def _payload_has_app_auth_error(self, payload):
+        """Return True when the app API says the token is invalid or expired."""
+        if not isinstance(payload, dict):
+            return False
+
+        code = payload.get("code")
+        message = str(payload.get("msg", "")).lower()
+        return code == 13002 or "token has expired" in message or "unauthorized" in message
 
     def _normalize_device_payload(self, payload):
         """Normalize app or web payloads into the coordinator data shape."""
@@ -290,7 +291,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         except (TypeError, ValueError):
             return None
 
-    async def _fetch_app_device_info(self):
+    async def _fetch_app_device_info(self, retried=False):
         """Fetch device state from the mobile app endpoint when token auth is available."""
         user_id = self.auth_coordinator.user_id
         headers = self._build_app_headers()
@@ -327,6 +328,16 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                         self.device_id,
                         payload,
                     )
+                if self._payload_has_app_auth_error(payload):
+                    _LOGGER.warning(
+                        "Aroma-Link app token rejected for device %s; refreshing app auth.",
+                        self.device_id,
+                    )
+                    if retried:
+                        return None
+                    if await self.auth_coordinator.async_refresh_app_auth():
+                        return await self._fetch_app_device_info(retried=True)
+                    return None
                 normalized = self._normalize_device_payload(payload)
                 if normalized is not None:
                     _LOGGER.warning(
@@ -361,7 +372,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             )
             return None
 
-    async def _app_switch(self, state_to_set):
+    async def _app_switch(self, state_to_set, retried=False):
         """Send on/off commands to the mobile app endpoint when token auth is available."""
         user_id = self.auth_coordinator.user_id
         headers = self._build_app_headers()
@@ -388,6 +399,23 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 self._log_response("POST", "http://www.aroma-link.com/v1/app/data/newSwitch", response.status)
                 response_text = await response.text()
                 self._log_response_body("app_switch", response_text)
+                payload = None
+                try:
+                    payload = await response.json(content_type=None)
+                except Exception:
+                    payload = None
+
+                if self._payload_has_app_auth_error(payload):
+                    _LOGGER.warning(
+                        "Aroma-Link app switch token rejected for device %s; refreshing app auth.",
+                        self.device_id,
+                    )
+                    if retried:
+                        return False
+                    if await self.auth_coordinator.async_refresh_app_auth():
+                        return await self._app_switch(state_to_set, retried=True)
+                    return False
+
                 return response.status == 200
         except Exception as err:
             _LOGGER.debug(
