@@ -142,6 +142,7 @@ A: You don't need to! The integration automatically discovers your devices and l
 
 ## Version History
 
+- 1.5.1: Added app-auth/device-endpoint debugging and broader app response parsing
 - 1.5.0: Renamed the fork to the `aromalink_integration_v1` domain and package folder
 - 1.4.0: Renamed the fork to the `ha_aromalink` domain and `HA Aromalink` display name
 - 1.3.0: Renamed the fork to the `ha_aroma_link` domain with a neutral HA-specific identity

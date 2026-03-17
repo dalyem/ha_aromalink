@@ -76,6 +76,19 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             self.device_id,
         )
 
+    def _log_response_body(self, label, body):
+        """Temporarily log truncated response bodies while reverse engineering."""
+        if not AROMA_LINK_TRACE_REQUESTS:
+            return
+
+        preview = body if len(body) <= 1200 else f"{body[:1200]}...<truncated>"
+        _LOGGER.warning(
+            "Aroma-Link response body [%s] | device_id=%s | %s",
+            label,
+            self.device_id,
+            preview,
+        )
+
     def _build_headers(self, referer, jsessionid=None, content_type=None):
         """Build request headers for Aroma-Link device requests."""
         headers = {
@@ -110,30 +123,116 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
     def _normalize_device_payload(self, payload):
         """Normalize app or web payloads into the coordinator data shape."""
-        device_data = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
+        device_data = self._find_candidate_device_data(payload)
         if not isinstance(device_data, dict):
             return None
 
-        on_off = device_data.get("onOff")
-        if on_off is None and "state" in device_data:
-            state_value = device_data.get("state")
-            if isinstance(state_value, bool):
-                on_off = 1 if state_value else 0
-            elif str(state_value).lower() in {"1", "true", "on"}:
-                on_off = 1
-            elif str(state_value).lower() in {"0", "false", "off"}:
-                on_off = 0
+        on_off = self._coerce_on_off(
+            device_data.get("onOff")
+            if "onOff" in device_data
+            else device_data.get("state")
+        )
+
+        if on_off is None:
+            on_off = self._coerce_on_off(device_data.get("switchStatus"))
+        if on_off is None:
+            on_off = self._coerce_on_off(device_data.get("isOpen"))
+        if on_off is None:
+            on_off = self._coerce_on_off(device_data.get("isOn"))
+
+        work_status = self._coerce_int(
+            device_data.get("workStatus")
+            if "workStatus" in device_data
+            else device_data.get("work_status")
+        )
+        if work_status is None:
+            work_status = self._coerce_int(device_data.get("runStatus"))
+
+        if on_off is None and work_status is not None:
+            on_off = 0 if work_status == 0 else 1
+
+        work_remain_time = self._coerce_int(
+            device_data.get("workRemainTime")
+            if "workRemainTime" in device_data
+            else device_data.get("workRemainSeconds")
+        )
+        pause_remain_time = self._coerce_int(
+            device_data.get("pauseRemainTime")
+            if "pauseRemainTime" in device_data
+            else device_data.get("pauseRemainSeconds")
+        )
 
         return {
-            "state": on_off == 1,
+            "state": on_off == 1 if on_off is not None else False,
             "onOff": on_off,
-            "workStatus": device_data.get("workStatus"),
-            "workRemainTime": device_data.get("workRemainTime"),
-            "pauseRemainTime": device_data.get("pauseRemainTime"),
+            "workStatus": work_status,
+            "workRemainTime": work_remain_time,
+            "pauseRemainTime": pause_remain_time,
             "raw_device_data": device_data,
             "device_id": self.device_id,
             "device_name": self.device_name,
         }
+
+    def _find_candidate_device_data(self, payload):
+        """Find the nested object most likely to contain device state."""
+        interesting_keys = {
+            "onOff",
+            "state",
+            "switchStatus",
+            "isOpen",
+            "isOn",
+            "workStatus",
+            "work_status",
+            "runStatus",
+            "workRemainTime",
+            "pauseRemainTime",
+            "workRemainSeconds",
+            "pauseRemainSeconds",
+            "onCount",
+            "pumpCount",
+        }
+
+        if isinstance(payload, dict):
+            if interesting_keys.intersection(payload.keys()):
+                return payload
+
+            for value in payload.values():
+                candidate = self._find_candidate_device_data(value)
+                if candidate is not None:
+                    return candidate
+
+        if isinstance(payload, list):
+            for item in payload:
+                candidate = self._find_candidate_device_data(item)
+                if candidate is not None:
+                    return candidate
+
+        return payload if isinstance(payload, dict) else None
+
+    def _coerce_on_off(self, value):
+        """Convert various truthy device values into Aroma-Link on/off flags."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return 1 if value else 0
+        if isinstance(value, (int, float)):
+            if value in (0, 1):
+                return int(value)
+        value_str = str(value).strip().lower()
+        if value_str in {"1", "true", "on", "open", "opened"}:
+            return 1
+        if value_str in {"0", "false", "off", "close", "closed"}:
+            return 0
+        return None
+
+    def _coerce_int(self, value):
+        """Convert known numeric-like payload values to ints."""
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     async def _fetch_app_device_info(self):
         """Fetch device state from the mobile app endpoint when token auth is available."""
@@ -163,8 +262,18 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     )
                     return None
 
+                response_text = await response.text()
+                self._log_response_body("app_device_info", response_text)
                 payload = await response.json(content_type=None)
                 normalized = self._normalize_device_payload(payload)
+                if normalized is not None:
+                    _LOGGER.warning(
+                        "Aroma-Link normalized app device payload | device_id=%s | keys=%s | onOff=%s | workStatus=%s",
+                        self.device_id,
+                        sorted(normalized["raw_device_data"].keys()),
+                        normalized.get("onOff"),
+                        normalized.get("workStatus"),
+                    )
                 if normalized is None:
                     _LOGGER.debug(
                         "App device info response for %s did not contain recognizable data.",
@@ -204,6 +313,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 timeout=15,
             ) as response:
                 self._log_response("POST", "http://www.aroma-link.com/v1/app/data/newSwitch", response.status)
+                response_text = await response.text()
+                self._log_response_body("app_switch", response_text)
                 return response.status == 200
         except Exception as err:
             _LOGGER.debug(
@@ -309,6 +420,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             ) as response:
                 self._log_response("GET", url, response.status)
                 if response.status == 200:
+                    response_text = await response.text()
+                    self._log_response_body("web_work_time", response_text)
                     response_json = await response.json()
 
                     if response_json.get("code") == 200 and "data" in response_json and response_json["data"]:
@@ -474,6 +587,15 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         try:
             if await self._app_switch(state_to_set):
+                optimistic_data = dict(self.data or self._default_device_data())
+                optimistic_data["state"] = state_to_set
+                optimistic_data["onOff"] = 1 if state_to_set else 0
+                if not state_to_set:
+                    optimistic_data["workStatus"] = 0
+                elif optimistic_data.get("workStatus") is None:
+                    optimistic_data["workStatus"] = 1
+                self.data = optimistic_data
+
                 _LOGGER.info(
                     "Successfully commanded device %s to %s via app endpoint",
                     self.device_id,
