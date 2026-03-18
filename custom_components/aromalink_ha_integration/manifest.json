@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/dalyem/ha_aromalink/issues",
   "loggers": ["custom_components.aromalink_ha_integration"],
   "requirements": [],
-  "version": "1.9.0"
+  "version": "2.0.0"
 }
