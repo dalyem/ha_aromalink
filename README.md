@@ -4,7 +4,7 @@ This custom component integrates Aroma-Link WiFi diffusers with Home Assistant.
 
 > **Note:** The integration appears in Home Assistant as `Aromalink Integration` with the domain `aromalink_ha_integration`.
 
-> **1.9 upgrade note:** Version `1.9.0` rebrands the integration domain from `aromalink_integration_v1` to `aromalink_ha_integration`. Existing config entries from `aroma_link_integration`, `dalyem_aroma_link`, `ha_aromalink`, and `aromalink_integration_v1` are not migrated automatically.
+> **2.0 upgrade note:** Version `2.0.0` rebrands the integration domain from `aromalink_integration_v1` to `aromalink_ha_integration`. Existing config entries from `aroma_link_integration`, `dalyem_aroma_link`, `ha_aromalink`, and `aromalink_integration_v1` are not migrated automatically.
 
 ![Aroma-Link logo](brand/logo.png)
 
@@ -17,7 +17,7 @@ This custom component integrates Aroma-Link WiFi diffusers with Home Assistant.
 - Auto-discover all devices on your Aroma-Link account
 - Configure the polling interval from Home Assistant
 
-## Migration to 1.9.0
+## Migration to 2.0.0
 
 1. Update the repository in HACS or replace the manual install folder with `custom_components/aromalink_ha_integration`.
 2. Restart Home Assistant.
@@ -59,6 +59,20 @@ cp -r custom_components/aromalink_ha_integration <home_assistant_config>/custom_
 3. Search for `Aromalink Integration`.
 4. Enter your Aroma-Link username and password.
 5. Home Assistant will discover all supported devices on the account.
+
+## Options and Settings
+
+- Polling interval default: `60` seconds
+- Polling interval minimum: `10` seconds
+- Polling interval maximum: `300` seconds
+- Polling interval step: `10` seconds
+- Where to change it: Open the integration and edit the `Polling Interval` control
+- Work duration minimum: `5` seconds
+- Work duration maximum: `900` seconds
+- Work duration step: `1` second
+- Pause duration minimum: `5` seconds
+- Pause duration maximum: `900` seconds
+- Pause duration step: `5` seconds
 
 ## Services
 
@@ -128,7 +142,7 @@ Useful options:
 
 ## Version History
 
-- `1.9.0`: Rebranded to the `aromalink_ha_integration` domain and `Aromalink Integration` name, added migration guidance, and removed secret-adjacent debug logging
+- `2.0.0`: Rebranded to the `aromalink_ha_integration` domain and `Aromalink Integration` name, added migration guidance, and removed secret-adjacent debug logging
 - `1.5.8`: Changed the default work/pause values to `10 / 90`
 - `1.5.7`: Added a user-configurable polling interval option and improved runtime consistency
 - `1.5.6`: Switched runtime fallback to the working web device-list endpoints and added the local probe script
