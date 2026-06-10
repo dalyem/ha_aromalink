@@ -1,7 +1,7 @@
 """Number platform for Aroma-Link."""
 import logging
 from homeassistant.components.number import NumberEntity
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
 from .const import (
     DOMAIN,
@@ -136,6 +136,7 @@ class AromaLinkWorkDurationNumber(NumberEntity):
         self._attr_native_unit_of_measurement = "seconds"
         self._attr_icon = "mdi:spray"
         self._attr_mode = "box"  # Make it a number input field instead of a slider
+        self._attr_entity_category = EntityCategory.CONFIG  # Settings card, below main controls
 
     @property
     def name(self):
@@ -151,7 +152,7 @@ class AromaLinkWorkDurationNumber(NumberEntity):
     def native_value(self):
         """Return the current value."""
         return self._coordinator.work_duration
-        
+
     async def async_set_native_value(self, value):
         """Set the work duration."""
         self._coordinator.work_duration = int(value)
@@ -166,11 +167,6 @@ class AromaLinkWorkDurationNumber(NumberEntity):
             manufacturer="Aroma-Link",
             model="Diffuser",
         )
-
-    async def async_set_native_value(self, value):
-        """Set the work duration."""
-        self._coordinator.work_duration = int(value)
-        self.async_write_ha_state()
 
 class AromaLinkPauseDurationNumber(NumberEntity):
     """Representation of an Aroma-Link pause duration setting."""
@@ -187,7 +183,8 @@ class AromaLinkPauseDurationNumber(NumberEntity):
         self._attr_native_step = 5  # 5 second steps
         self._attr_native_unit_of_measurement = "seconds"
         self._attr_icon = "mdi:timer-pause"
-        self._attr_mode = "box"  # Make it a number input field instead of a slider
+        self._attr_mode = "box"
+        self._attr_entity_category = EntityCategory.CONFIG  # Settings card, below main controls
 
     @property
     def name(self):
