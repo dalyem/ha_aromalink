@@ -7,13 +7,13 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import aiohttp
 
 from .const import (
-    AROMA_LINK_SSL,
-    DOMAIN,
-    CONF_USERNAME,
-    CONF_PASSWORD,
     CONF_DEVICE_ID,
+    CONF_IGNORE_SSL,
+    CONF_PASSWORD,
     CONF_POLL_INTERVAL_SECONDS,
+    CONF_USERNAME,
     DEFAULT_POLL_INTERVAL_SECONDS,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,9 +45,10 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input[CONF_USERNAME]
             password = user_input[CONF_PASSWORD]
+            ignore_ssl = user_input.get(CONF_IGNORE_SSL, False)
 
             # Try to authenticate
-            session, jsessionid, devices = await self._authenticate(username, password)
+            session, jsessionid, devices = await self._authenticate(username, password, ignore_ssl)
             
             if jsessionid:
                 self._username = username
@@ -77,6 +78,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data={
                             CONF_USERNAME: username,
                             CONF_PASSWORD: password,
+                            CONF_IGNORE_SSL: ignore_ssl,
                             "user_id": user_id,
                             "devices": [
                                 {
@@ -101,12 +103,13 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_USERNAME): str,
                     vol.Required(CONF_PASSWORD): str,
+                    vol.Optional(CONF_IGNORE_SSL, default=False): bool,
                 }
             ),
             errors=errors,
         )
         
-    async def _authenticate(self, username, password):
+    async def _authenticate(self, username, password, ignore_ssl=False):
         """Authenticate with Aroma-Link API and retrieve device list.
         
         Returns:
@@ -116,6 +119,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             - devices: List of discovered devices, or empty list if none found
         """
         session = async_get_clientsession(self.hass)
+        ssl = False if ignore_ssl else None
         jsessionid = None
         devices = []
         
@@ -139,7 +143,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 login_url,
                 data=data,
                 headers=headers,
-                ssl=AROMA_LINK_SSL,
+                ssl=ssl,
             ) as response:
                 response_text = await response.text()
                 
@@ -152,7 +156,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         
                         # Now fetch device list
                         _LOGGER.debug("Fetching device list")
-                        devices = await self._fetch_device_list(session, jsessionid)
+                        devices = await self._fetch_device_list(session, jsessionid, ssl)
                         
                         _LOGGER.info(f"Found {len(devices)} devices for {username}")
                         return session, jsessionid, devices
@@ -219,7 +223,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
         return None
         
-    async def _fetch_device_list(self, session, jsessionid):
+    async def _fetch_device_list(self, session, jsessionid, ssl=None):
         """Fetch the list of devices for the authenticated user."""
         language_code = "EN"
         device_list_url = "https://www.aroma-link.com/device/list/v2?limit=10&offset=0&selectUserId=&groupId=&deviceName=&imei=&deviceNo=&workStatus=&continentId=&countryId=&areaId=&sort=&order="
@@ -232,7 +236,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 async with session.get(
                     "https://www.aroma-link.com/device/list",
                     timeout=10,
-                    ssl=AROMA_LINK_SSL,
+                    ssl=ssl,
                 ) as init_response:
                     init_response.raise_for_status()
             except Exception as e:
@@ -248,7 +252,7 @@ class AromaLinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             async with session.get(
                 device_list_url,
                 headers=device_headers,
-                ssl=AROMA_LINK_SSL,
+                ssl=ssl,
             ) as device_response:
                 if device_response.status == 200:
                     device_response_text = await device_response.text()

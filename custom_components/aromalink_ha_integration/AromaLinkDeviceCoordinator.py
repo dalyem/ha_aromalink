@@ -5,7 +5,6 @@ from datetime import timedelta
 import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .const import (
-    AROMA_LINK_SSL,
     DOMAIN,
     DEFAULT_DIFFUSE_TIME,
     DEFAULT_WORK_DURATION,
@@ -283,7 +282,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     url,
                     headers=headers,
                     timeout=15,
-                    ssl=AROMA_LINK_SSL,
+                    ssl=self.auth_coordinator.ssl,
                 ) as response:
                     self._log_response("GET", url, response.status)
                     if response.status != 200:
