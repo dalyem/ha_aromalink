@@ -197,7 +197,7 @@ class AromaLinkTotalRunTimeSensor(AromaLinkSensorBase):
         return round(raw / 3600, 2)
 
 class AromaLinkPumpCountSensor(AromaLinkSensorBase):
-    """Sensor showing total diffusion time in hours (airPumpCount × work_duration)."""
+    """Sensor showing total diffusion time in hours (airPumpCount * work_duration)."""
 
     def __init__(self, coordinator, entry, device_id, device_name):
         """Initialize the pump count sensor."""
@@ -213,7 +213,7 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
 
     @property
     def native_value(self):
-        """Return total diffusion time in hours (pump_count × work_duration / 3600)."""
+        """Return total diffusion time in hours (pump_count * work_duration / 3600)."""
         pump_count = self._get_raw_count(
             "pumpCount",
             "airPumpCount",
@@ -227,6 +227,10 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
         
         work_duration = self.coordinator.work_duration or 0
         if work_duration <= 0:
+            _LOGGER.debug(
+                "Omitting historical diffusion time for %s: invalid work_duration=%d",
+                self._device_id, work_duration
+            )
             return None
         
         # airPumpCount counts activations; multiply by work duration to get total diffusion time.

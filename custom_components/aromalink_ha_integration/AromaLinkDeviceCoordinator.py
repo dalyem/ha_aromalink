@@ -745,7 +745,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             raise
         except Exception as e:
             _LOGGER.error(f"Error fetching device {self.device_id} info: {e}")
-            raise UpdateFailed(f"Error: {e}")
+            raise UpdateFailed(f"Error: {e}") from e
 
     def _has_valid_durations(self):
         """Return True when work and pause durations are both > 0."""

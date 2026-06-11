@@ -49,11 +49,7 @@ class AromaLinkPowerSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def available(self):
-        """Device only pumps when work/pause durations are configured > 0."""
-        work = self.coordinator.work_duration or 0
-        pause = self.coordinator.pause_duration or 0
-        if work <= 0 or pause <= 0:
-            return False
+        """Return true when the coordinator reports this device reachable."""
         return super().available
 
     @property
@@ -67,7 +63,7 @@ class AromaLinkPowerSwitch(CoordinatorEntity, SwitchEntity):
         )
 
     async def async_turn_on(self, **kwargs):
-        """Turn the device on (start pumping oil)."""
+        """Turn the device on when work/pause durations are configured."""
         work = self.coordinator.work_duration or 0
         pause = self.coordinator.pause_duration or 0
         if work <= 0 or pause <= 0:
