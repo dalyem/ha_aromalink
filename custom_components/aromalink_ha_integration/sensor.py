@@ -22,7 +22,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(AromaLinkWorkStatusSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkWorkRemainingTimeSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkPauseRemainingTimeSensor(coordinator, entry, device_id, device_info["name"]))
-        entities.append(AromaLinkOnCountSensor(coordinator, entry, device_id, device_info["name"]))
+        entities.append(AromaLinkTotalRunTimeSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkPumpCountSensor(coordinator, entry, device_id, device_info["name"]))
     
     async_add_entities(entities)
@@ -163,25 +163,25 @@ class AromaLinkPauseRemainingTimeSensor(AromaLinkSensorBase):
             return 0
         return None
 
-class AromaLinkOnCountSensor(AromaLinkSensorBase):
-    """Sensor showing how many times the device has been turned on."""
+class AromaLinkTotalRunTimeSensor(AromaLinkSensorBase):
+    """Sensor showing total accumulated run time in hours."""
 
     def __init__(self, coordinator, entry, device_id, device_name):
-        """Initialize the on count sensor."""
+        """Initialize the total run time sensor."""
         super().__init__(
-            coordinator, 
-            entry, 
-            device_id, 
-            device_name, 
-            "On Count", 
-            icon="mdi:counter",
-            unit="activations"
+            coordinator,
+            entry,
+            device_id,
+            device_name,
+            "Total Run Time",
+            icon="mdi:timer-sand-complete",
+            unit=UnitOfTime.HOURS
         )
 
     @property
     def native_value(self):
-        """Return the on count value."""
-        return self._get_raw_count(
+        """Return total run time in hours (runCount is seconds)."""
+        raw = self._get_raw_count(
             "onCount",
             "runCount",
             "on_count",
@@ -191,9 +191,13 @@ class AromaLinkOnCountSensor(AromaLinkSensorBase):
             "startCount",
             "start_count",
         )
+        if raw is None:
+            return None
+        # runCount accumulates seconds of work time; convert to hours.
+        return round(raw / 3600, 2)
 
 class AromaLinkPumpCountSensor(AromaLinkSensorBase):
-    """Sensor showing the number of times the pump has operated (diffusions)."""
+    """Sensor showing total diffusion time in hours (airPumpCount * work_duration)."""
 
     def __init__(self, coordinator, entry, device_id, device_name):
         """Initialize the pump count sensor."""
@@ -202,15 +206,15 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
             entry, 
             device_id, 
             device_name, 
-            "Pump Count", 
-            icon="mdi:shimmer",
-            unit="diffusions"
+            "Total Diffusion Time", 
+            icon="mdi:spray-bottle",
+            unit=UnitOfTime.HOURS
         )
 
     @property
     def native_value(self):
-        """Return the pump count value."""
-        return self._get_raw_count(
+        """Return total diffusion time in hours (pump_count * work_duration / 3600)."""
+        pump_count = self._get_raw_count(
             "pumpCount",
             "airPumpCount",
             "pump_count",
@@ -218,3 +222,17 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
             "pumpTimes",
             "pump_times",
         )
+        if pump_count is None:
+            return None
+        
+        work_duration = self.coordinator.work_duration or 0
+        if work_duration <= 0:
+            _LOGGER.debug(
+                "Omitting historical diffusion time for %s: invalid work_duration=%d",
+                self._device_id, work_duration
+            )
+            return None
+        
+        # airPumpCount counts activations; multiply by work duration to get total diffusion time.
+        total_seconds = pump_count * work_duration
+        return round(total_seconds / 3600, 2)

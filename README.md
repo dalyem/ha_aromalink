@@ -101,7 +101,8 @@ Parameters:
 
 The integration creates:
 
-- Switch entities for diffuser power
+- **Power switch** — Controls oil pumping. Requires valid work/pause durations (> 0) to activate.
+- **Fan switch** — Controls the exhaust fan independently of oil pumping. Use to accelerate scent distribution without running the diffuser.
 - Button entities for run/save actions
 - Number entities for work duration, pause duration, and polling interval
 - Sensor entities for runtime and device statistics

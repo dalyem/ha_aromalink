@@ -51,6 +51,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             "workStatus": None,
             "workRemainTime": None,
             "pauseRemainTime": None,
+            "fan": False,
             "raw_device_data": {},
             "device_id": self.device_id,
             "device_name": self.device_name,
@@ -706,30 +707,60 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         try:
             web_list_data = await self._fetch_web_list_state(jsessionid)
+            result = None
             if web_list_data is not None:
-                return self._apply_recent_switch_state(
+                result = self._apply_recent_switch_state(
                     self._merge_device_data(previous_data, web_list_data)
                 )
+            else:
+                app_data = await self._fetch_app_device_info()
+                if app_data is not None:
+                    result = self._apply_recent_switch_state(
+                        self._merge_device_data(previous_data, app_data)
+                    )
 
-            app_data = await self._fetch_app_device_info()
-            if app_data is not None:
-                return self._apply_recent_switch_state(
-                    self._merge_device_data(previous_data, app_data)
+            if result is None:
+                _LOGGER.warning(
+                    "Failed to fetch runtime state for device %s from web list and app newWork endpoints.",
+                    self.device_id,
                 )
+                raise UpdateFailed("Failed to fetch device runtime state")
 
-            _LOGGER.warning(
-                "Failed to fetch runtime state for device %s from web list and app newWork endpoints.",
-                self.device_id,
-            )
-            raise UpdateFailed("Failed to fetch device runtime state")
+            # Warn on stale cached state (statisticsUpdateTime > 5 min old)
+            stats_time = result.get("raw_device_data", {}).get("statisticsUpdateTime")
+            if stats_time is not None:
+                try:
+                    update_age_seconds = (time.time() * 1000 - int(stats_time)) / 1000
+                    if update_age_seconds > 300:
+                        _LOGGER.debug(
+                            "Device %s serving stale state (%.0fs old). onlineStatus=1 but data may be cached.",
+                            self.device_id, update_age_seconds
+                        )
+                except (TypeError, ValueError):
+                    pass
+
+            return result
         except UpdateFailed:
             raise
         except Exception as e:
             _LOGGER.error(f"Error fetching device {self.device_id} info: {e}")
-            raise UpdateFailed(f"Error: {e}")
+            raise UpdateFailed(f"Error: {e}") from e
+
+    def _has_valid_durations(self):
+        """Return True when work and pause durations are both > 0."""
+        work = self._work_duration or 0
+        pause = self._pause_duration or 0
+        return work > 0 and pause > 0
 
     async def turn_on_off(self, state_to_set):
-        """Turn the diffuser on or off."""
+        """Turn the diffuser on or off. Requires valid durations to turn on."""
+        if state_to_set and not self._has_valid_durations():
+            _LOGGER.warning(
+                "Cannot turn on device %s: work_duration=%d, pause_duration=%d (both must be > 0)",
+                self.device_id, self._work_duration or 0, self._pause_duration or 0
+            )
+            return False
+
         await self.auth_coordinator._ensure_login()
         jsessionid = self.auth_coordinator.jsessionid
 
@@ -804,6 +835,55 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     return False
         except Exception as e:
             _LOGGER.error(f"Control error for device {self.device_id}: {e}")
+            return False
+
+    async def set_fan(self, state_to_set):
+        """Turn the exhaust fan on or off."""
+        await self.auth_coordinator._ensure_login()
+        jsessionid = self.auth_coordinator.jsessionid
+
+        url = "https://www.aroma-link.com/device/switch"
+        data = {
+            "deviceId": self.device_id,
+            "fan": 1 if state_to_set else 0
+        }
+
+        await self._prime_device_session(jsessionid)
+        headers = self._build_headers(
+            referer=f"https://www.aroma-link.com/device/command/{self.device_id}",
+            jsessionid=jsessionid,
+            content_type="application/x-www-form-urlencoded; charset=UTF-8",
+        )
+
+        try:
+            self._log_request("POST", url, extra=f"fan={'1' if state_to_set else '0'}")
+            async with self.auth_coordinator.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=10,
+                ssl=self.auth_coordinator.ssl,
+            ) as response:
+                self._log_response("POST", url, response.status)
+                if response.status == 200:
+                    _LOGGER.info(
+                        f"Successfully set fan to {'on' if state_to_set else 'off'} for device {self.device_id}")
+                    optimistic_data = self._merge_device_data(
+                        self.data,
+                        {"fan": state_to_set},
+                    )
+                    self.async_set_updated_data(optimistic_data)
+                    return True
+                elif response.status in [401, 403]:
+                    _LOGGER.warning(f"Authentication error on set_fan ({response.status}).")
+                    self.auth_coordinator.jsessionid = None
+                    return False
+                else:
+                    _LOGGER.error(
+                        f"Failed to control fan for device {self.device_id}: {response.status}")
+                    return False
+        except Exception as e:
+            _LOGGER.error(f"Fan control error for device {self.device_id}: {e}")
             return False
 
     async def set_scheduler(self, work_duration=None, pause_duration=None, week_days=None):
@@ -910,21 +990,24 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
     async def run_diffuser(self, work_duration=None, pause_duration=None):
         """Run the diffuser for a specific time."""
-        # Use default values if specific ones aren't provided
         current_work_duration = work_duration if work_duration is not None else self._work_duration
         current_pause_duration = pause_duration if pause_duration is not None else self._pause_duration
-        buffertime = current_work_duration + 5  # Add buffer time
+
+        if current_work_duration <= 0 or current_pause_duration <= 0:
+            _LOGGER.warning(
+                "Cannot run device %s: work_duration=%d, pause_duration=%d (both must be > 0)",
+                self.device_id, current_work_duration, current_pause_duration
+            )
+            return False
+
+        buffertime = current_work_duration + 5
 
         _LOGGER.info(
             f"Setting up device {self.device_id} to run for {current_work_duration} seconds with {current_work_duration} second diffusion cycles and {current_pause_duration} second pauses")
 
-        # Set scheduler
         if not await self.set_scheduler(current_work_duration, current_pause_duration):
-            _LOGGER.error(
-                f"Failed to set scheduler for device {self.device_id}")
+            _LOGGER.error(f"Failed to set schedule for device {self.device_id}")
             return False
-
-        await asyncio.sleep(1)  # Allow time for scheduler settings to apply
 
         if not await self.turn_on_off(True):
             _LOGGER.error(f"Failed to turn on device {self.device_id}")
