@@ -1,7 +1,6 @@
 """Constants for the Aroma-Link integration."""
 
 DOMAIN = "aromalink_ha_integration"
-AROMA_LINK_SSL = False  # Temporary workaround for Aroma-Link's expired certificate.
 
 # Configuration
 CONF_USERNAME = "username"
@@ -10,6 +9,7 @@ CONF_DEVICE_ID = "device_id"
 CONF_DIFFUSE_TIME = "diffuse_time"
 CONF_WORK_DURATION = "work_duration"
 CONF_POLL_INTERVAL_SECONDS = "poll_interval_seconds"
+CONF_IGNORE_SSL = "ignore_ssl"
 
 # Default values
 DEFAULT_DIFFUSE_TIME = 60  # seconds

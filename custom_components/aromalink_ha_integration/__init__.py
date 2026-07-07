@@ -11,10 +11,11 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 
 from .const import (
-    DOMAIN,
     CONF_DEVICE_ID,
+    CONF_IGNORE_SSL,
     CONF_POLL_INTERVAL_SECONDS,
     DEFAULT_POLL_INTERVAL_SECONDS,
+    DOMAIN,
     SERVICE_SET_SCHEDULER,
     SERVICE_RUN_DIFFUSER,
     ATTR_WORK_DURATION,
@@ -67,6 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Aroma-Link from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
+    ignore_ssl = entry.data.get(CONF_IGNORE_SSL, False)
     devices = entry.data.get("devices", [])
 
     if not devices and CONF_DEVICE_ID in entry.data:
@@ -97,6 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         username=username,
         password=password,
         user_id=user_id,
+        ignore_ssl=ignore_ssl,
     )
 
     # Force first login and initialization
