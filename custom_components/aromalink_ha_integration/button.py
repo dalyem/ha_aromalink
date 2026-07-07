@@ -110,7 +110,10 @@ class AromaLinkSaveSettingsButton(ButtonEntity):
             )
             return
 
-        result = await self._coordinator.set_scheduler(work_duration, pause_duration)
+        # Persist the durations without enabling the 24/7 schedule slot, so
+        # saving settings no longer switches the device into scheduled
+        # operation (issue #31). Use the set_scheduler service to enable one.
+        result = await self._coordinator.set_scheduler(work_duration, pause_duration, enabled=False)
         if result:
             _LOGGER.info(f"Settings saved successfully for {self._coordinator.device_name}")
         else:

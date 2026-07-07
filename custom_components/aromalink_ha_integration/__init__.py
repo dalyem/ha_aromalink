@@ -21,6 +21,7 @@ from .const import (
     ATTR_WORK_DURATION,
     ATTR_PAUSE_DURATION,
     ATTR_WEEK_DAYS,
+    ATTR_ENABLED,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ SET_SCHEDULER_SCHEMA = vol.Schema({
     vol.Optional(ATTR_WEEK_DAYS): vol.All(
         cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min=0, max=6))]
     ),
+    vol.Optional(ATTR_ENABLED, default=True): cv.boolean,
     vol.Optional("device_id"): cv.string,
 })
 
@@ -154,14 +156,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         work_duration = call.data.get(ATTR_WORK_DURATION)
         pause_duration = call.data.get(ATTR_PAUSE_DURATION)
         week_days = call.data.get(ATTR_WEEK_DAYS, [0, 1, 2, 3, 4, 5, 6])
+        enabled = call.data.get(ATTR_ENABLED, True)
 
         # If device_id specified, use that coordinator
         if device_id and device_id in device_coordinators:
-            await device_coordinators[device_id].set_scheduler(work_duration, pause_duration, week_days)
+            await device_coordinators[device_id].set_scheduler(work_duration, pause_duration, week_days, enabled=enabled)
         elif len(device_coordinators) == 1:
             # If only one device, use that
             first_device_id = list(device_coordinators.keys())[0]
-            await device_coordinators[first_device_id].set_scheduler(work_duration, pause_duration, week_days)
+            await device_coordinators[first_device_id].set_scheduler(work_duration, pause_duration, week_days, enabled=enabled)
         else:
             _LOGGER.error("Multiple devices available, must specify device_id")
 

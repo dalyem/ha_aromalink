@@ -10,6 +10,9 @@ set_scheduler:
     week_days:
       description: "List of weekdays (0-6, where 0 is Monday) for which the schedule applies."
       example: [0, 1, 2, 3, 4, 5, 6]
+    enabled:
+      description: "Whether the schedule slot is active (default true). Set false to save the durations while turning scheduled operation off, e.g. to clear a stuck schedule."
+      example: true
     device_id:
       description: "The ID of the device to apply the schedule to. Required if multiple devices are available."
       example: "device_12345"

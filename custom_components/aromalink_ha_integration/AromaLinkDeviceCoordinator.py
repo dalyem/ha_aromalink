@@ -886,8 +886,14 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             _LOGGER.error(f"Fan control error for device {self.device_id}: {e}")
             return False
 
-    async def set_scheduler(self, work_duration=None, pause_duration=None, week_days=None):
-        """Set the scheduler for the diffuser."""
+    async def set_scheduler(self, work_duration=None, pause_duration=None, week_days=None, enabled=True):
+        """Write work/pause durations to schedule slot 0.
+
+        With enabled=True the device runs the slot as a 00:00-23:59 schedule on
+        the given days, which makes it auto-toggle power on its own. With
+        enabled=False the durations are persisted but scheduled operation stays
+        off, so the device only runs when commanded via the power switch.
+        """
         await self.auth_coordinator._ensure_login()
         jsessionid = self.auth_coordinator.jsessionid
 
@@ -908,7 +914,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 {
                     "startTime": "00:00",
                     "endTime": "23:59",
-                    "enabled": 1,
+                    "enabled": 1 if enabled else 0,
                     "consistenceLevel": "1",
                     "workDuration": str(work_duration),
                     "pauseDuration": str(pause_duration)
@@ -956,7 +962,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         )
 
         try:
-            self._log_request("POST", url, extra=f"week_days={week_days}")
+            self._log_request("POST", url, extra=f"week_days={week_days} enabled={enabled}")
             async with self.auth_coordinator.session.post(
                 url,
                 json=payload,
@@ -971,7 +977,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                     self._work_duration = work_duration
                     self._pause_duration = pause_duration
                     _LOGGER.info(
-                        f"Successfully set scheduler for device {self.device_id}")
+                        f"Successfully set scheduler for device {self.device_id} (enabled={enabled})")
                     await self.async_request_refresh()
                     self.hass.async_create_task(self._delayed_refresh())
                     return True
@@ -1011,6 +1017,8 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
 
         if not await self.turn_on_off(True):
             _LOGGER.error(f"Failed to turn on device {self.device_id}")
+            # Don't leave the 24/7 schedule armed when the run never started.
+            await self._disable_schedule(current_work_duration, current_pause_duration)
             return False
 
         _LOGGER.info(
@@ -1021,6 +1029,9 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
             await asyncio.sleep(buffertime)
             _LOGGER.info(
                 f"Timer complete for device {self.device_id}. Attempting to turn off.")
+            # Disarm the schedule first so the device cannot re-activate itself
+            # between the off command and the schedule write (issue #31).
+            await self._disable_schedule(current_work_duration, current_pause_duration)
             if not await self.turn_on_off(False):
                 _LOGGER.error(
                     f"Failed to automatically turn off device {self.device_id}")
@@ -1031,3 +1042,14 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
         self.hass.async_create_task(turn_off_later())
 
         return True
+
+    async def _disable_schedule(self, work_duration, pause_duration):
+        """Disable schedule slot 0 while keeping the saved durations on the device."""
+        if await self.set_scheduler(work_duration, pause_duration, enabled=False):
+            _LOGGER.info(
+                f"Disabled schedule for device {self.device_id} after momentary run")
+            return True
+        _LOGGER.error(
+            f"Failed to disable schedule for device {self.device_id}; "
+            "the device may keep cycling until the schedule is cleared")
+        return False
