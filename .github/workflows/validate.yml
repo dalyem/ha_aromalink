@@ -17,7 +17,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # The repo has no LICENSE file (the upstream fork never had one), so
-          # the license check fails on in-repo branches while fork PRs skip it.
-          # Drop this ignore once a license is chosen and committed.
-          ignore: license

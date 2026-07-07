@@ -164,7 +164,8 @@ Useful options:
 
 ## License
 
-This integration is provided as-is with no warranties.
+This project is licensed under the [MIT License](LICENSE). The software is
+provided as-is, without warranty of any kind.
 
 ## Links
 
