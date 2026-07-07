@@ -29,8 +29,10 @@ class AromaLinkPowerSwitch(CoordinatorEntity, SwitchEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._device_id = device_id
-        self._name = f"{device_name} Active"
-        self._unique_id = f"{entry.data['username']}_{device_id}_power"
+        self._name = f"{device_name} Power"
+        # Keep the pre-split unique_id so existing registry entries,
+        # automations, and history carry over to this entity.
+        self._unique_id = f"{entry.data['username']}_{device_id}_switch"
 
     @property
     def name(self):
