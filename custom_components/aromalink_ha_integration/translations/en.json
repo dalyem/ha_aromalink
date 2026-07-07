@@ -6,7 +6,11 @@
         "description": "Enter your Aroma-Link account credentials. All your devices will be automatically discovered.",
         "data": {
           "username": "Aroma-Link Username",
-          "password": "Aroma-Link Password"
+          "password": "Aroma-Link Password",
+          "ignore_ssl": "Ignore SSL certificate errors"
+        },
+        "data_description": {
+          "ignore_ssl": "Enable if you are experiencing connection errors due to an expired or misconfigured Aroma-Link server certificate."
         }
       }
     },

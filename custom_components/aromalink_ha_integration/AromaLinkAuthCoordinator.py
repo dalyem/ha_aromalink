@@ -10,7 +10,7 @@ import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import AROMA_LINK_SSL, DOMAIN
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 AROMA_LINK_USER_AGENT = (
@@ -23,7 +23,7 @@ AROMA_LINK_USER_AGENT = (
 class AromaLinkAuthCoordinator(DataUpdateCoordinator):
     """Coordinator for handling authentication and session management."""
 
-    def __init__(self, hass, username, password, user_id=None):
+    def __init__(self, hass, username, password, user_id=None, ignore_ssl=False):
         """Initialize the auth coordinator."""
         self.username = username
         self.password = password
@@ -33,6 +33,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
         self.language_code = "EN"
         self.user_id = user_id
         self.session = async_get_clientsession(hass)
+        self._ignore_ssl = ignore_ssl
         self._last_login_time = 0
 
         super().__init__(
@@ -42,6 +43,15 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             # Check auth every 15 minutes
             update_interval=timedelta(minutes=15),
         )
+
+    @property
+    def ssl(self):
+        """Return SSL parameter for aiohttp requests.
+
+        Returns False (skip verification) when the user has opted to ignore SSL errors,
+        or None (use default session SSL context) otherwise.
+        """
+        return False if self._ignore_ssl else None
 
     async def _async_update_data(self):
         """Fetch authentication data."""
@@ -108,7 +118,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
             async with self.session.get(
                 "https://www.aroma-link.com/",
                 timeout=10,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.ssl,
             ) as initial_response:
                 initial_response.raise_for_status()
                 _LOGGER.debug(
@@ -121,7 +131,7 @@ class AromaLinkAuthCoordinator(DataUpdateCoordinator):
                 data=data,
                 headers=headers,
                 timeout=10,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.ssl,
             ) as response:
                 response_text = await response.text()
                 _LOGGER.debug(f"Login response status: {response.status}")
