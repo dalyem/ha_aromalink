@@ -27,6 +27,10 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["switch", "button", "number", "sensor"]
 
+# Setup happens exclusively through config entries; this also surfaces a clear
+# error if the domain is placed in configuration.yaml.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 SET_SCHEDULER_SCHEMA = vol.Schema({
     vol.Required(ATTR_WORK_DURATION): vol.All(vol.Coerce(int), vol.Range(min=5, max=900)),
     vol.Optional(ATTR_PAUSE_DURATION): vol.All(vol.Coerce(int), vol.Range(min=5, max=900)),

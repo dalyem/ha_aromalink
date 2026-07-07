@@ -159,7 +159,7 @@ Useful options:
 
 - A valid Aroma-Link account
 - At least one registered diffuser
-- Home Assistant 2023.3.0 or newer
+- Home Assistant 2023.6.0 or newer
 - An active internet connection
 
 ## License
