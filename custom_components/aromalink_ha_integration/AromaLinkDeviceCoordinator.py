@@ -582,7 +582,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 url,
                 headers=headers,
                 timeout=15,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.auth_coordinator.ssl,
             ) as response:
                 self._log_response("GET", url, response.status)
                 if response.status == 200:
@@ -650,7 +650,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 url,
                 headers=headers,
                 timeout=15,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.auth_coordinator.ssl,
             ) as response:
                 self._log_response("GET", url, response.status)
                 if response.status == 200:
@@ -774,7 +774,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 data=data,
                 headers=headers,
                 timeout=10,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.auth_coordinator.ssl,
             ) as response:
                 self._log_response("POST", url, response.status)
                 if response.status == 200:
@@ -882,7 +882,7 @@ class AromaLinkDeviceCoordinator(DataUpdateCoordinator):
                 json=payload,
                 headers=headers,
                 timeout=10,
-                ssl=AROMA_LINK_SSL,
+                ssl=self.auth_coordinator.ssl,
             ) as response:
                 self._log_response("POST", url, response.status)
                 response_text = await response.text()
