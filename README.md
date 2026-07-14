@@ -108,7 +108,11 @@ The integration creates:
 - **Fan switch** — Controls the exhaust fan independently of oil pumping. Use to accelerate scent distribution without running the diffuser.
 - Button entities for run/save actions. **Run Once** arms the schedule only for the duration of the run and disarms it afterwards; **Save Settings** persists the work/pause durations without enabling scheduled operation.
 - Number entities for work duration, pause duration, and polling interval
-- Sensor entities for runtime and device statistics
+- Sensor entities for runtime and device statistics:
+  - **Work Status**, **Work Remaining Time**, **Pause Remaining Time** — live cycle state.
+  - **Total Run Time** (hours) — the API's `runCount`, which accumulates seconds of work time.
+  - **Total Diffusion Time** (hours) — estimated as pump activations × current work duration.
+  - **On Count** / **Pump Count** — the raw API counters (long-term statistics enabled). The device pushes these upstream on its own schedule, so they typically update about once a day.
 
 ## Technical Notes
 
