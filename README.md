@@ -85,11 +85,14 @@ Parameters:
 - `work_duration`: Required work duration in seconds.
 - `pause_duration`: Optional pause duration in seconds.
 - `week_days`: Optional list of weekdays.
+- `enabled`: Optional, default `true`. Set `false` to save durations while turning scheduled operation off (also handy for clearing a stuck schedule).
 - `device_id`: Required when multiple devices exist.
 
 ### `aromalink_ha_integration.run_diffuser`
 
-Run the diffuser immediately.
+Run the diffuser immediately. The schedule slot used for the run is disabled
+again when the run finishes, so the device does not keep cycling on its own
+afterwards.
 
 Parameters:
 
@@ -103,7 +106,7 @@ The integration creates:
 
 - **Power switch** — Controls oil pumping. Requires valid work/pause durations (> 0) to activate.
 - **Fan switch** — Controls the exhaust fan independently of oil pumping. Use to accelerate scent distribution without running the diffuser.
-- Button entities for run/save actions
+- Button entities for run/save actions. **Run Once** arms the schedule only for the duration of the run and disarms it afterwards; **Save Settings** persists the work/pause durations without enabling scheduled operation.
 - Number entities for work duration, pause duration, and polling interval
 - Sensor entities for runtime and device statistics
 
