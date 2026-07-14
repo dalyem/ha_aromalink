@@ -150,6 +150,7 @@ Useful options:
 
 ## Version History
 
+- `2.1.0`: Added a configurable SSL-bypass option and a separate exhaust-fan switch, stopped momentary runs and settings saves from leaving the 24/7 schedule enabled, shielded switch commands from stale cloud polls, restored the On Count / Pump Count sensors with long-term statistics, added the reverse-engineered API reference (`docs/API.md`), and adopted the MIT license
 - `2.0.0`: Rebranded to the `aromalink_ha_integration` domain and `Aromalink Integration` name, added migration guidance, and removed secret-adjacent debug logging
 - `1.5.8`: Changed the default work/pause values to `10 / 90`
 - `1.5.7`: Added a user-configurable polling interval option and improved runtime consistency
