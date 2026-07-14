@@ -1,6 +1,6 @@
 """Sensor platform for Aroma-Link."""
 import logging
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.const import UnitOfTime
@@ -23,8 +23,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(AromaLinkWorkRemainingTimeSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkPauseRemainingTimeSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkTotalRunTimeSensor(coordinator, entry, device_id, device_info["name"]))
+        entities.append(AromaLinkTotalDiffusionTimeSensor(coordinator, entry, device_id, device_info["name"]))
+        entities.append(AromaLinkOnCountSensor(coordinator, entry, device_id, device_info["name"]))
         entities.append(AromaLinkPumpCountSensor(coordinator, entry, device_id, device_info["name"]))
-    
+
     async_add_entities(entities)
 
 class AromaLinkSensorBase(CoordinatorEntity, SensorEntity):
@@ -196,17 +198,17 @@ class AromaLinkTotalRunTimeSensor(AromaLinkSensorBase):
         # runCount accumulates seconds of work time; convert to hours.
         return round(raw / 3600, 2)
 
-class AromaLinkPumpCountSensor(AromaLinkSensorBase):
+class AromaLinkTotalDiffusionTimeSensor(AromaLinkSensorBase):
     """Sensor showing total diffusion time in hours (airPumpCount * work_duration)."""
 
     def __init__(self, coordinator, entry, device_id, device_name):
-        """Initialize the pump count sensor."""
+        """Initialize the total diffusion time sensor."""
         super().__init__(
-            coordinator, 
-            entry, 
-            device_id, 
-            device_name, 
-            "Total Diffusion Time", 
+            coordinator,
+            entry,
+            device_id,
+            device_name,
+            "Total Diffusion Time",
             icon="mdi:spray-bottle",
             unit=UnitOfTime.HOURS
         )
@@ -224,7 +226,7 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
         )
         if pump_count is None:
             return None
-        
+
         work_duration = self.coordinator.work_duration or 0
         if work_duration <= 0:
             _LOGGER.debug(
@@ -232,7 +234,71 @@ class AromaLinkPumpCountSensor(AromaLinkSensorBase):
                 self._device_id, work_duration
             )
             return None
-        
+
         # airPumpCount counts activations; multiply by work duration to get total diffusion time.
         total_seconds = pump_count * work_duration
         return round(total_seconds / 3600, 2)
+
+class AromaLinkOnCountSensor(AromaLinkSensorBase):
+    """Raw counter the API reports for run activity (issue #2).
+
+    Keeps the pre-2.x unique_id, name, and unit so existing entities and
+    recorded history continue seamlessly. When served by the web list API
+    the underlying field is runCount, which accumulates seconds of work
+    time rather than a number of activations (see docs/API.md).
+    """
+
+    def __init__(self, coordinator, entry, device_id, device_name):
+        """Initialize the on count sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            device_id,
+            device_name,
+            "On Count",
+            icon="mdi:counter",
+            unit="activations"
+        )
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self):
+        """Return the on count value."""
+        return self._get_raw_count(
+            "onCount",
+            "runCount",
+            "on_count",
+            "run_count",
+            "openCount",
+            "open_count",
+            "startCount",
+            "start_count",
+        )
+
+class AromaLinkPumpCountSensor(AromaLinkSensorBase):
+    """Raw pump activation counter (airPumpCount, +1 per completed cycle)."""
+
+    def __init__(self, coordinator, entry, device_id, device_name):
+        """Initialize the pump count sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            device_id,
+            device_name,
+            "Pump Count",
+            icon="mdi:shimmer",
+            unit="diffusions"
+        )
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self):
+        """Return the pump count value."""
+        return self._get_raw_count(
+            "pumpCount",
+            "airPumpCount",
+            "pump_count",
+            "air_pump_count",
+            "pumpTimes",
+            "pump_times",
+        )
